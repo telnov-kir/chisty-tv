@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="ru">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Чистый ТВ — реальное отключение рекламы по ADB</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-view="wizard">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <symbol id="i-tv" viewBox="0 0 24 24">
+                <rect x="2" y="5" width="20" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                <path d="M8 21h8M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </symbol>
+            <symbol id="i-plug" viewBox="0 0 24 24">
+                <path d="M9 3v5M15 3v5M7 8h10v4a5 5 0 01-10 0z" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M12 17v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </symbol>
+            <symbol id="i-grid" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" opacity=".5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor" opacity=".5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" opacity=".25" />
+            </symbol>
+            <symbol id="i-box" viewBox="0 0 24 24">
+                <path d="M3 8l9-5 9 5v8l-9 5-9-5z" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linejoin="round" />
+                <path d="M3 8l9 5 9-5M12 13v8" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </symbol>
+            <symbol id="i-radar" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4" />
+                <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".6" />
+                <path d="M12 12L19 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+            </symbol>
+            <symbol id="i-gauge" viewBox="0 0 24 24">
+                <path d="M4 18a9 9 0 1116 0" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" />
+                <path d="M12 14l4-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                <circle cx="12" cy="14" r="1.6" fill="currentColor" />
+            </symbol>
+            <symbol id="i-term" viewBox="0 0 24 24">
+                <rect x="2" y="4" width="20" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                <path d="M6 9l3 3-3 3M12 15h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </symbol>
+            <symbol id="i-journal" viewBox="0 0 24 24">
+                <path d="M5 3h11l3 3v15H5z" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linejoin="round" />
+                <path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </symbol>
+            <symbol id="i-check" viewBox="0 0 24 24">
+                <path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </symbol>
+            <symbol id="i-x" viewBox="0 0 24 24">
+                <path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </symbol>
+            <symbol id="i-lock" viewBox="0 0 24 24">
+                <rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                <path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="1.8" />
+            </symbol>
+            <symbol id="i-shield" viewBox="0 0 24 24">
+                <path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z" fill="none" stroke="currentColor"
+                    stroke-width="1.8" stroke-linejoin="round" />
+                <path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </symbol>
+            <symbol id="i-warn" viewBox="0 0 24 24">
+                <path d="M12 3L2 20h20z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                <path d="M12 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                <circle cx="12" cy="17" r="1.2" fill="currentColor" />
+            </symbol>
+            <symbol id="i-info" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7" />
+                <path d="M12 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                <circle cx="12" cy="7.5" r="1.2" fill="currentColor" />
+            </symbol>
+            <symbol id="i-copy" viewBox="0 0 24 24">
+                <rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.7" />
+                <path d="M4 16V4h12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            </symbol>
+            <symbol id="i-download" viewBox="0 0 24 24">
+                <path d="M12 3v12M7 10l5 5 5-5M4 21h16" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </symbol>
+            <symbol id="i-undo" viewBox="0 0 24 24">
+                <path d="M8 5L3 10l5 5M3 10h11a6 6 0 016 6v1" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </symbol>
+            <symbol id="i-zap" viewBox="0 0 24 24">
+                <path d="M13 2L4 14h6l-1 8 9-12h-6z" fill="currentColor" />
+            </symbol>
+            <symbol id="i-search" viewBox="0 0 24 24">
+                <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+                <path d="M15.5 15.5L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </symbol>
+            <symbol id="i-refresh" viewBox="0 0 24 24">
+                <path d="M20 12a8 8 0 11-2.3-5.6M20 3v4h-4" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </symbol>
+            <symbol id="i-grip" viewBox="0 0 24 24">
+                <circle cx="9" cy="6" r="1.6" fill="currentColor" />
+                <circle cx="15" cy="6" r="1.6" fill="currentColor" />
+                <circle cx="9" cy="12" r="1.6" fill="currentColor" />
+                <circle cx="15" cy="12" r="1.6" fill="currentColor" />
+                <circle cx="9" cy="18" r="1.6" fill="currentColor" />
+                <circle cx="15" cy="18" r="1.6" fill="currentColor" />
+            </symbol>
+            <symbol id="i-plus" viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </symbol>
+            <symbol id="i-trash" viewBox="0 0 24 24">
+                <path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </symbol>
+            <symbol id="i-chev" viewBox="0 0 24 24">
+                <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </symbol>
+            <symbol id="i-wifi" viewBox="0 0 24 24">
+                <path d="M2 9a15 15 0 0120 0M5.5 12.5a10 10 0 0113 0M9 16a5 5 0 016 0" fill="none" stroke="currentColor"
+                    stroke-width="1.8" stroke-linecap="round" />
+                <circle cx="12" cy="19.5" r="1.4" fill="currentColor" />
+            </symbol>
+        </defs>
+    </svg>
+
+    <div class="bg" aria-hidden="true">
+        <div class="bg-mesh"></div>
+        <div class="bg-aurora a1"></div>
+        <div class="bg-aurora a2"></div>
+        <div class="bg-grain"></div>
+        <div class="bg-scanlines"></div>
+    </div>
+    <div class="training-banner" id="training-banner" hidden><svg>
+            <use href="#i-warn" />
+        </svg>
+        <span><b>УЧЕБНЫЙ РЕЖИМ.</b> Вымышленный телевизор, реальные команды не выполняются.</span>
+        <button class="btn btn-ghost btn-sm" data-action="training-exit">Выйти в реальный режим</button>
+    </div>
+
+    <header class="topbar">
+        <div class="logo"><span class="logo-glyph"><svg>
+                    <use href="#i-tv" />
+                </svg></span>
+            <span class="logo-word">Чистый<b>ТВ</b><small>реальные команды · полный протокол</small></span>
+        </div>
+        <div class="topbar-status"><span id="chip-server" class="chip">сервер: …</span><span id="chip-adb"
+                class="chip">ADB: …</span><span id="chip-device" class="chip">ТВ: не подключён</span></div>
+        <div class="topbar-right">
+            <a class="btn btn-donate" href="https://www.donationalerts.com/r/kirarok" target="_blank" rel="noopener"
+                title="Поддержать проект на DonationAlerts">
+                <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor">
+                    <path
+                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <span>Поддержать</span></a>
+            <button class="btn btn-ghost btn-sm" id="btn-disconnect" data-action="disconnect" hidden><svg>
+                    <use href="#i-x" />
+                </svg>Отключить ТВ</button>
+        </div>
+    </header>
+
+    <div class="shell">
+        <nav class="sidebar" id="sidebar" aria-label="Разделы"></nav>
+        <main class="main" id="main">
+
+            <section class="view" id="view-wizard">
+                <div class="view-head"><span class="kicker">Мастер подключения</span>
+                    <h2>Подключаем <em>твой настоящий</em> телевизор</h2>
+                    <p class="view-sub">Каждый шаг — реальное действие. Каждая команда видна в протоколе.</p>
+                </div>
+                <div id="backend-card"></div>
+                <div class="card">
+                    <div class="card-title"><svg>
+                            <use href="#i-tv" />
+                        </svg>Шаг 1 · Выбери систему телевизора</div>
+                    <p class="muted">Не знаешь систему? Начни с «Как определить».</p>
+                    <div class="plat-cards" id="plat-cards"></div>
+                </div>
+                <div id="steps-box"></div>
+                <div class="card connect-card">
+                    <div class="card-title"><svg>
+                            <use href="#i-wifi" />
+                        </svg>Шаг 5 · Подключение с компьютера</div>
+                    <div class="rsa-note" id="rsa-note" hidden><svg>
+                            <use href="#i-warn" />
+                        </svg><span>На экране ТВ запрос <b>«Разрешить отладку?»</b> → «Всегда разрешать» → ОК, затем
+                            повтори.</span></div>
+                    <div class="row"><input id="conn-ip" type="text" placeholder="IP телевизора, например 192.168.3.4"
+                            autocomplete="off">
+                        <button class="btn btn-primary" id="btn-connect" data-action="conn-go"><svg>
+                                <use href="#i-plug" />
+                            </svg>Подключить</button>
+                    </div>
+                    <label class="check-line"><input type="checkbox" id="pair-mode"
+                            data-change="pair-mode"><span>Android 11+ · беспроводная отладка с кодом</span></label>
+                    <div id="pair-fields" class="pair-fields" hidden>
+                        <input id="pair-addr" type="text" placeholder="ip:port из «Подключение с помощью кода»">
+                        <input id="pair-code" type="text" placeholder="6-значный код" maxlength="6" inputmode="numeric">
+                        <input id="conn-addr" type="text"
+                            placeholder="ip:port с главного экрана отладки (другой порт!)">
+                    </div>
+                    <p class="muted" id="conn-hint">Обычный режим: достаточно «Отладки по USB» — порт 5555 откроется
+                        сам.</p>
+                    <div class="card-title sub"><svg>
+                            <use href="#i-term" />
+                        </svg>Протокол подключения</div>
+                    <pre class="terminal" id="wizard-protocol" aria-live="polite"></pre>
+                </div>
+                <div class="card">
+                    <div class="card-title"><svg>
+                            <use href="#i-warn" />
+                        </svg>Если не подключается</div>
+                    <div id="trouble-box"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title"><svg>
+                            <use href="#i-info" />
+                        </svg>Samsung, LG и другие неподдерживаемые</div>
+                    <div id="unsupported-box"></div>
+                </div>
+                <div class="training-entry"><button class="btn btn-ghost btn-sm" data-action="training-start"><svg>
+                            <use href="#i-grid" />
+                        </svg>Учебный пример (вымышленный ТВ)</button></div>
+            </section>
+
+            <section class="view" id="view-overview">
+                <div class="view-head"><span class="kicker">Подключённый телевизор</span>
+                    <h2 id="ov-title">Обзор</h2>
+                    <p class="view-sub">Данные прочитаны с ТВ реальными командами. Авто-план — только проверенная база;
+                        остальное через скан и подтверждение.</p>
+                </div>
+                <div class="ov-grid">
+                    <div class="card" id="ov-device"></div>
+                    <div class="stats-grid" id="ov-stats"></div>
+                </div>
+                <div class="card" id="ov-disabled"></div>
+                <div class="card">
+                    <div class="card-title"><svg>
+                            <use href="#i-shield" />
+                        </svg>Что именно будет сделано</div>
+                    <p class="muted">План — точный список команд <code>pm disable-user</code>. Ничего не удаляется.
+                        Порядок — перетаскиванием. Перед выполнением — предпросмотр.</p>
+                    <div class="plan-top"><span id="plan-summary" class="muted"></span>
+                        <div class="plan-actions"><button class="btn btn-ghost btn-sm" data-action="plan-reset"><svg>
+                                    <use href="#i-refresh" />
+                                </svg>Пересобрать</button>
+                            <button class="btn btn-primary" id="btn-plan-run" data-action="plan-preview"><svg>
+                                    <use href="#i-zap" />
+                                </svg>Показать план и выполнить</button>
+                        </div>
+                    </div>
+                    <div id="plan-list"></div>
+                </div>
+                <div class="card protect-card" id="ov-protect"></div>
+            </section>
+
+            <section class="view" id="view-diag">
+                <div class="view-head"><span class="kicker">Почему тормозит</span>
+                    <h2>Диагностика производительности</h2>
+                    <p class="view-sub">Реальные показания с ТВ: память, загрузка CPU, топ процессов, место на
+                        накопителе, температура SoC. Без догадок.</p>
+                </div>
+                <div class="card">
+                    <div class="plan-top"><span class="muted" id="diag-note"></span>
+                        <button class="btn btn-primary" id="btn-diag" data-action="diag-run"><svg>
+                                <use href="#i-gauge" />
+                            </svg>Снять показания</button>
+                    </div>
+                    <div id="diag-verdict"></div>
+                    <div class="diag-grid" id="diag-grid"></div>
+                    <div class="card-title sub"><svg>
+                            <use href="#i-term" />
+                        </svg>Топ процессов в момент замера</div>
+                    <div id="diag-top"></div>
+                </div>
+            </section>
+
+            <section class="view" id="view-packages">
+                <div class="view-head"><span class="kicker">Реальные пакеты телевизора</span>
+                    <h2>Пакеты</h2>
+                    <p class="view-sub">Список из <code>pm list packages</code>, статусы из <code>-e / -d</code>.
+                        Защищённые сервер не отключит никогда.</p>
+                </div>
+                <div class="card">
+                    <div class="toolbar">
+                        <label class="search-box"><svg>
+                                <use href="#i-search" />
+                            </svg><input id="filter-q" type="text" placeholder="Поиск по имени и назначению… ( / )"
+                                autocomplete="off"></label>
+                        <select id="filter-status" data-change="status-filter" class="select">
+                            <option value="all">Все статусы</option>
+                            <option value="active">Активны</option>
+                            <option value="disabled">Отключены</option>
+                            <option value="protected">Защищены</option>
+                        </select>
+                        <select id="filter-sort" data-change="sort" class="select">
+                            <option value="risk">Сначала опасные</option>
+                            <option value="name">По имени</option>
+                            <option value="cat">По категории</option>
+                        </select>
+                        <select id="view-select" data-change="saved-view" class="select"></select>
+                        <button class="btn btn-ghost btn-sm" data-action="save-view"><svg>
+                                <use href="#i-plus" />
+                            </svg>Вид</button>
+                    </div>
+                    <div class="chips" id="cat-chips"></div>
+                    <label class="check-line"><input type="checkbox" id="filter-verified"
+                            data-change="verified"><span>Только проверенная база (для авто-плана); сними галку, чтобы
+                            видеть все пакеты ТВ</span></label>
+                    <div class="bulkbar" id="bulkbar" hidden>
+                        <label class="check-all"><input type="checkbox" id="sel-all" data-change="sel-all"><span>Все
+                                видимые</span></label>
+                        <span class="bulk-count" id="bulk-count"></span>
+                        <div class="bulk-actions"><button class="btn btn-danger btn-sm" data-action="bulk-disable"><svg>
+                                    <use href="#i-zap" />
+                                </svg>Отключить</button>
+                            <button class="btn btn-ghost btn-sm" data-action="bulk-enable"><svg>
+                                    <use href="#i-undo" />
+                                </svg>Включить</button>
+                            <button class="btn btn-ghost btn-sm" data-action="bulk-plan"><svg>
+                                    <use href="#i-plus" />
+                                </svg>В план</button>
+                            <button class="btn btn-ghost btn-sm" data-action="bulk-clear"><svg>
+                                    <use href="#i-x" />
+                                </svg>Снять</button>
+                        </div>
+                    </div>
+                    <div class="pkg-meta-row"><span id="pkg-count"></span><span class="muted">клик по строке — карточка
+                            и точная команда</span></div>
+                    <div id="pkg-list" class="pkg-list"></div>
+                </div>
+            </section>
+
+            <section class="view" id="view-scan">
+                <div class="view-head"><span class="kicker">Поиск вне базы</span>
+                    <h2>Скан подозрительных пакетов</h2>
+                    <p class="view-sub">Эвристика по именам. Кандидаты, не вердикт: проверяй на 4PDA, в план — только
+                        после подтверждения.</p>
+                </div>
+                <div class="card">
+                    <div class="plan-top"><span class="muted" id="scan-note"></span>
+                        <button class="btn btn-primary" id="btn-scan" data-action="scan-run"><svg>
+                                <use href="#i-radar" />
+                            </svg>Запустить скан</button>
+                    </div>
+                    <div id="scan-list"></div>
+                </div>
+            </section>
+
+            <section class="view" id="view-protocol">
+                <div class="view-head"><span class="kicker">Полная прозрачность</span>
+                    <h2>Протокол команд</h2>
+                    <p class="view-sub">Каждая команда ADB и дословный ответ ТВ. Пишется также в файл на диске.</p>
+                </div>
+                <div class="card">
+                    <div class="plan-top"><span class="muted" id="proto-count"></span>
+                        <div class="plan-actions"><button class="btn btn-ghost btn-sm" data-action="proto-copy"><svg>
+                                    <use href="#i-copy" />
+                                </svg>Копировать</button>
+                            <button class="btn btn-ghost btn-sm" data-action="proto-export"><svg>
+                                    <use href="#i-download" />
+                                </svg>Экспорт</button>
+                            <button class="btn btn-ghost btn-sm" data-action="proto-refresh"><svg>
+                                    <use href="#i-refresh" />
+                                </svg>Обновить</button>
+                        </div>
+                    </div>
+                    <div id="proto-list" class="proto-list"></div>
+                </div>
+            </section>
+
+            <section class="view" id="view-journals">
+                <div class="view-head"><span class="kicker">Откат</span>
+                    <h2>Журналы сессий</h2>
+                    <p class="view-sub">Каждое отключение записано. Откат выполняет реальные <code>pm enable</code>.</p>
+                </div>
+                <div id="journal-list" class="journal-list"></div>
+            </section>
+
+        </main>
+    </div>
+    <div class="scrim" id="scrim" data-action="drawer-close" hidden></div>
+    <aside class="drawer" id="drawer">
+        <div class="drawer-head"><span class="kicker">Карточка пакета</span>
+            <button class="icon-btn" data-action="drawer-close"><svg>
+                    <use href="#i-x" />
+                </svg></button>
+        </div>
+        <div class="drawer-body" id="drawer-body"></div>
+    </aside>
+    <div id="modal-root"></div>
+    <div id="toast-root" class="toast-root" aria-live="polite"></div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
