@@ -1,6 +1,3 @@
-## `README.md` (полная замена)
-
-```markdown
 # Чистый ТВ
 
 [![Поддержать на DonationAlerts](https://img.shields.io/badge/Поддержать-DonationAlerts-ff4dd8)](https://www.donationalerts.com/r/kirarok)
