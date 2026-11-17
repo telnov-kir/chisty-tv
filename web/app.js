@@ -342,7 +342,7 @@
     }
 
     /* ---------- пакеты ---------- */
-    const catChips = [['all', 'Все', 'var(--acc)'], ['ads', 'Реклама', '#ff3d5e'], ['track', 'Слежка и ACR', '#8b7bff'], ['perf', 'Производительность', '#c6ff4d'], ['update', 'Обновления', '#ffb02e'], ['bloat', 'Bloatware', '#38c8ff'], ['media', 'Медиа', '#3dffa8'], ['system', 'Системные', '#8fa2bd'], ['unknown', 'Вне базы', '#5d6f8c']];
+    const catChips = [['all', 'Все', 'var(--acc)'], ['ads', 'Реклама', '#ff3d5e'], ['track', 'Слежка и ACR', '#8b7bff'], ['perf', 'Производительность', '#c6ff4d'], ['apps', 'Приложения', '#38c8ff'], ['update', 'Обновления', '#ffb02e'], ['bloat', 'Bloatware', '#38c8ff'], ['media', 'Медиа', '#3dffa8'], ['system', 'Системные', '#8fa2bd'], ['unknown', 'Вне базы', '#5d6f8c']];
     function filteredPackages() {
         const f = S.filters; let l = [...S.packages];
         if (f.verified) l = l.filter(p => p.verified);
@@ -373,7 +373,8 @@
             const stTxt = p.protected ? 'защищён' : p.status === 'disabled' ? 'отключён' : 'активен';
             return `<article class="pkg-row ${p.status === 'disabled' ? 'is-disabled' : ''} ${p.protected ? 'is-protected' : ''}" data-action="open" data-name="${esc(p.name)}" tabindex="0">
       <label class="pkg-check no-open"><input type="checkbox" data-change="row-check" data-name="${esc(p.name)}" ${S.sel.has(p.name) ? 'checked' : ''} ${p.protected ? 'disabled' : ''}></label>
-      <div class="pkg-main"><div class="pkg-name">${esc(p.name)}</div><div class="pkg-label">${esc(p.label)}${p.verified ? '' : ' · вне базы'}</div></div>
+            <div class="pkg-main"><div class="pkg-name">${esc(p.name)}</div><div class="pkg-label">${esc(p.label)}</div>
+        <div class="pkg-effect ${p.protected ? 'bad' : ''}">${p.protected ? 'Запрещено: ' : (p.verified ? 'Что будет: ' : 'Вне базы: ')}${esc(p.verified ? p.note : 'сервер разрешит отключение, только если это установленное приложение')}</div></div>
       <span class="badge cat cat-${p.cat}">${esc((D.categories[p.cat] || {}).label || p.cat)}</span>
       <span class="badge risk risk-${p.risk}">${esc(D.risks[p.risk])}</span>
       <span class="status-pill st-${stCls}">${stTxt}</span>
@@ -382,17 +383,32 @@
             : `<div class="empty">${icon('search')}<div>Ничего не найдено. Измени фильтры или запрос.</div></div>`;
     }
     async function disableWithConfirm(names) {
-        const unknown = names.filter(n => !(S.packages.find(x => x.name === n) || {}).verified);
-        const rows = names.map(n => `<div class="m-row"><div class="m-name">${esc(n)}</div><div class="m-cmd">adb shell pm disable-user --user 0 ${esc(n)}</div></div>`).join('');
+        const prot = names.filter(n => (S.packages.find(x => x.name === n) || {}).protected);
+        const list = names.filter(n => !prot.includes(n));
+        if (prot.length) toast(`Пропущено защищённых: ${prot.length}. Их отключить нельзя.`, { type: 'warn' });
+        if (!list.length) { toast('Все выбранные пакеты защищены — отключать нечего.', { type: 'warn' }); return; }
+        const needType = list.length > 3;
+        const rows = list.map(n => {
+            const p = S.packages.find(x => x.name === n) || metaOf(n);
+            return `<div class="m-row"><div class="m-name">${esc(p.label)} <span class="badge risk-${p.risk}">${esc(D.risks[p.risk])}</span></div>
+      <div class="m-note">${esc(p.name)}</div>
+      <div class="m-effect">${esc(p.note || 'Пакет вне базы — назначение проверь на 4PDA.')}</div>
+      <div class="m-cmd">adb shell pm disable-user --user 0 ${esc(n)}</div></div>`;
+        }).join('');
         openModal({
-            title: `Отключить ${names.length} пакет(ов)?`, danger: true, confirmText: 'Выполнить команды',
-            body: `<div>Точные команды ниже. Ничего не удаляется; откат доступен.</div><div class="modal-list">${rows}</div>${unknown.length ? `<div class="modal-warn">${icon('warn')}<span>${unknown.length} вне базы — проверь на 4PDA.</span></div>` : ''}`,
-            onConfirm: async () => {
+            title: `Отключить ${list.length} пакет(ов)?`, danger: true, confirmText: 'Отключаю осознанно',
+            body: `<div>Прочитай, <b>что перестанет работать</b> у каждого пакета. Ничего не удаляется — откат через «Журналы».</div>
+      <div class="modal-list">${rows}</div>
+      ${needType ? `<div class="modal-warn">${icon('warn')}<span>Пакетов больше трёх. Впиши слово <b>ОТКЛЮЧИТЬ</b>, чтобы подтвердить.</span></div><input type="text" id="confirm-word" placeholder="ОТКЛЮЧИТЬ" autocomplete="off">` : ''}`,
+            onConfirm: async (w) => {
+                if (needType && (w.querySelector('#confirm-word').value || '').trim().toUpperCase() !== 'ОТКЛЮЧИТЬ') {
+                    w.querySelector('#confirm-word').focus(); return false;
+                }
                 try {
-                    const j = await BE().disable(names); const done = (j.results || []).filter(r => r.ok).map(r => r.name);
+                    const j = await BE().disable(list); const done = (j.results || []).filter(r => r.ok).map(r => r.name);
                     S.sel.clear(); await refreshAfterAction();
-                    if (done.length) toast(`Отключено: ${done.length}.`, { type: 'ok', undo: async () => { await BE().enable(done); await refreshAfterAction(); } });
-                    (j.results || []).filter(r => !r.ok).forEach(f => toast(`${f.name}: ${f.output}`, { type: 'err', timeout: 9000 }));
+                    if (done.length) toast(`Отключено: ${done.length}. Перезагрузи ТВ и проверь флешки, HDMI и пульт.`, { type: 'ok', undo: async () => { await BE().enable(done); await refreshAfterAction(); toast('Откат выполнен.', { type: 'ok' }); } });
+                    (j.results || []).filter(r => !r.ok).forEach(f => toast(`${f.name}: ${f.output}`, { type: 'err', timeout: 10000 }));
                 } catch (e) { toast('Ошибка: ' + e.message, { type: 'err' }); }
             }
         });

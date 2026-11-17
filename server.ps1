@@ -1,6 +1,10 @@
 # CHISTY TV - local server. ASCII-ONLY SOURCE.
 # PS 5.1 reads BOM-less .ps1 as CP1251; Cyrillic literals become smart quotes and break parsing.
 # All human-readable texts live in messages.json (read explicitly as UTF-8).
+#
+# SAFETY MODEL: default-deny.
+# A package may be disabled ONLY if it is a user-installed app (pm list packages -3)
+# or it is explicitly listed in $AllowDisable. Everything else is refused.
 $ErrorActionPreference = 'Continue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -20,21 +24,54 @@ if (-not $Msg) {
         E_IP = 'Bad TV IP.'; E_MULTIDEV = 'More than one device.'
         E_MULTIDEV_DETAIL = 'Multiple ADB devices: {0}. Run adb disconnect for extra ones.'
         E_NODEVICE = 'TV not connected.'; E_BADNAME = 'Bad package name.'; E_NOTINSTALLED = 'Not installed.'
-        E_PROTECTED = 'PROTECTED: disable blocked.'; E_PATH = 'Bad journal path.'; E_API = 'Unknown API.'
+        E_PROTECTED = 'PROTECTED: disable blocked.'; E_SYSTEM = 'SYSTEM package: not in allowlist, disable blocked.'
+        E_PATH = 'Bad journal path.'; E_API = 'Unknown API.'
     }
 }
 
-# Independent server-side guard: these packages are NEVER disabled.
-$Never = @(
-    'com.yandex.tv.services.platform', 'com.yandex.tv.live', 'ru.yandex.androidkeyboard.tv',
-    'ru.sberdevices.starlauncher', 'com.tcl.suspension', 'com.cvte.tv.hkcfac',
-    'com.android.location.fused', 'com.google.android.gms', 'com.android.vending'
+# Explicit allowlist: the ONLY system packages this tool may disable.
+$AllowDisable = @(
+    'com.google.android.tvrecommendations', 'com.google.android.katniss', 'com.google.android.apps.tv.dreamx',
+    'com.google.android.feedback', 'com.google.android.backuptransport', 'com.google.android.partnersetup',
+    'com.google.android.videos', 'com.google.android.play.games',
+    'com.google.android.youtube.tv', 'com.google.android.youtube.tvmusic',
+    'com.tcl.waterfall.overseas', 'com.tcl.tclchannel.overlay', 'com.tcl.advertise', 'com.tcl.assistant',
+    'com.tcl.browser', 'com.tcl.gallery', 'com.tcl.esticker', 'com.tcl.messagebox', 'com.tcl.useragreement',
+    'com.tcl.usercenter', 'com.tcl.dashboard', 'com.tcl.customize.overlay', 'com.tcl.partnercustomizer',
+    'com.tcl.miracast', 'com.tcl.MultiScreenInteraction_TV', 'com.tcl.keyhelp', 'com.tcl.hotemenu',
+    'com.yandex.android.advid', 'com.yandex.tv.recommendations', 'com.yandex.tv.analytics',
+    'com.yandex.tv.acr', 'com.yandex.tv.updater',
+    'com.miui.tv.analytics', 'com.xiaomi.mitv.advertise', 'com.xiaomi.mitv.upgrade', 'com.xiaomi.mitv.tvpushservice',
+    'ru.sberdevices.ads', 'ru.sberdevices.analytics', 'com.cvte.tv.advertise',
+    'ru.kinopoisk.tv', 'ru.start.androidmobile', 'gpm.tnt_premier', 'mobi.zona', 'com.vk.tv', 'ru.yandex.music',
+    'tv.wuaki.apptv', 'com.tvos', 'com.netflix.ninja', 'com.amazon.amazonvideo.livingroom',
+    'com.valvesoftware.steamlink', 'com.hiro.vpn', 'com.lagomproductsllc.lagomvpn', 'com.ogonconnect.app',
+    'com.pipinetwork.piplvpn'
 )
-$Patterns = @('inputmethod', 'keyboard', 'launcher', 'tvhome', 'systemui', 'installer', 'providers',
-    '\.settings', 'wifi', 'bluetooth', 'hdmi', 'tvinput', 'factory', 'hkcfac', 'location\.fused',
-    'services\.platform', 'yandex\.tv\.live', 'tcl\.suspension', 'starlauncher', 'gms$', 'vending')
 
-$S = @{ Adb = $null; Device = $null; Info = $null; Pkgs = @(); Enabled = @(); Disabled = @();
+# Hard never-list (in addition to default-deny).
+$Never = @(
+    'android', 'com.android.shell', 'com.android.externalstorage', 'com.android.permissioncontroller',
+    'com.google.android.permissioncontroller', 'com.google.android.gsf', 'com.google.android.webview',
+    'com.tcl.android.webview', 'com.google.android.gms', 'com.android.vending', 'com.android.location.fused',
+    'com.tcl.system.server', 'com.tcl.tv', 'com.tcl.ttvs', 'com.tcl.guard', 'com.tcl.initsetup',
+    'com.tcl.autopair', 'com.tcl.micmanager', 'com.tcl.suspension', 'com.tcl.tv.tclhome_passive',
+    'com.tcl.ui_mediaCenter', 'com.google.android.tv.remote.service', 'com.google.android.apps.mediashell',
+    'com.yandex.tv.services.platform', 'com.yandex.tv.live', 'ru.yandex.androidkeyboard.tv',
+    'ru.sberdevices.starlauncher', 'com.cvte.tv.hkcfac'
+)
+$Patterns = @('inputmethod', 'keyboard', 'launcher', 'tvhome', 'tclhome', 'systemui', 'installer', 'providers',
+    '\.settings', 'wifi', 'bluetooth', 'hdmi', 'tvinput', 'factory', 'hkcfac', 'location\.fused', 'services\.platform',
+    'yandex\.tv\.live', 'tcl\.suspension', 'starlauncher', 'gms$', 'gsf$', 'vending', '^android$', '^com\.android\.',
+    'webview', 'permissioncontroller', 'externalstorage', 'documentsui', '\.shell$', 'networkstack', 'tethering',
+    'captiveportal', 'keychain', 'proxyhandler', 'pacprocessor', 'statementservice', 'sharedstoragebackup',
+    'localtransport', 'backupconfirm', 'dynsystem', 'inputdevices', 'vpndialogs', 'companiondevicemanager', 'ctsshim',
+    'setupwraith', 'authbridge', 'mediashell', 'smartconnect', 'ext\.services', 'ext\.shared', 'modulemetadata',
+    'onetimeinitializer', 'overlay\.modules', 'syncadapters', '\.tts$', 'talkback', 'remote\.service',
+    'frameworkpackagestubs', 'com\.tcl\.system', 'com\.tcl\.guard', 'com\.tcl\.initsetup', 'com\.tcl\.autopair',
+    'com\.tcl\.micmanager', 'com\.tcl\.ttvs', '^com\.tcl\.tv$', 'channelpus', 't_solo', 'ui_mediacenter')
+
+$S = @{ Adb = $null; Device = $null; Info = $null; Pkgs = @(); Enabled = @(); Disabled = @(); ThirdParty = @();
     Protected = (New-Object 'System.Collections.Generic.HashSet[string]');
     Platform = 'generic'; WorkDir = $null; Protocol = @() 
 }
@@ -71,6 +108,7 @@ function Initialize-Adb {
 function Update-TvStates {
     $S.Enabled = ConvertFrom-PackageLines ((Invoke-TvShell 'pm list packages -e') -join "`n")
     $S.Disabled = ConvertFrom-PackageLines ((Invoke-TvShell 'pm list packages -d') -join "`n")
+    $S.ThirdParty = ConvertFrom-PackageLines ((Invoke-TvShell 'pm list packages -3') -join "`n")
 }
 function Get-TvPlatform {
     $marks = [ordered]@{
@@ -84,8 +122,6 @@ function Get-TvPlatform {
     foreach ($k in $marks.Keys) { foreach ($m in $marks[$k]) { if ($S.Pkgs -contains $m) { return $k } } }
     return 'generic'
 }
-# Resolve current HOME package. Candidate must look like a package name (contain a dot)
-# AND be present in the installed package list - otherwise dumpsys noise gets captured.
 function Get-HomePackage {
     $cmds = @(
         'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME',
@@ -108,7 +144,11 @@ function Get-HomePackage {
 function New-ProtectedSet {
     $set = New-Object 'System.Collections.Generic.HashSet[string]'
     foreach ($n in $Never) { [void]$set.Add($n) }
-    foreach ($p in $S.Pkgs) { foreach ($pat in $Patterns) { if ($p -match $pat) { [void]$set.Add($p); break } } }
+    foreach ($p in $S.Pkgs) {
+        foreach ($pat in $Patterns) { if ($p -match $pat) { [void]$set.Add($p); break } }
+        # default-deny: anything not user-installed and not allowlisted is protected
+        if (($S.ThirdParty -notcontains $p) -and ($AllowDisable -notcontains $p)) { [void]$set.Add($p) }
+    }
     if ($S.Info.launcher) { [void]$set.Add($S.Info.launcher) }
     if ($S.Info.ime) { [void]$set.Add($S.Info.ime) }
     $S.Protected = $set
@@ -133,8 +173,7 @@ function Connect-Tv($b) {
     if (-not $devs.Count) { return @{ ok = $false } }
     if ($devs.Count -gt 1) {
         $serials = ($devs | ForEach-Object { ($_.Trim() -split '\s+')[0] }) -join ', '
-        $tpl = $Msg.E_MULTIDEV_DETAIL
-        if (-not $tpl) { $tpl = $Msg.E_MULTIDEV }
+        $tpl = $Msg.E_MULTIDEV_DETAIL; if (-not $tpl) { $tpl = $Msg.E_MULTIDEV }
         throw ($tpl -f $serials)
     }
     $S.Device = ($devs[0].Trim() -split '\s+')[0]
@@ -159,6 +198,7 @@ function Connect-Tv($b) {
     $S.WorkDir = Join-Path $Docs ($safe + '_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
     New-Item -ItemType Directory -Path $S.WorkDir -Force | Out-Null
     $S.Pkgs | Set-Content (Join-Path $S.WorkDir 'packages.txt') -Encoding UTF8
+    $S.ThirdParty | Set-Content (Join-Path $S.WorkDir 'packages-user.txt') -Encoding UTF8
     (Invoke-TvShell 'getprop') | Set-Content (Join-Path $S.WorkDir 'getprop.txt') -Encoding UTF8
     foreach ($ns in 'system', 'secure', 'global') { (Invoke-TvShell "settings list $ns") | Set-Content (Join-Path $S.WorkDir "settings_$ns.txt") -Encoding UTF8 }
     Write-Protocol 'backup' ($Msg.backup + $S.WorkDir)
@@ -177,7 +217,6 @@ function Get-TvDiag {
         thermal = (Invoke-TvShell 'for z in /sys/class/thermal/thermal_zone*/temp; do echo "$z $(cat $z)"; done')
     }
 }
-
 function Write-Journal($names, [string]$kind) {
     $safe = ($S.Info.brand + '_' + $S.Info.model) -replace '[^\w\-]', '_'
     $dir = Join-Path $Docs ($safe + '\session_' + (Get-Date -Format 'yyyyMMdd_HHmmss_fff'))
@@ -195,6 +234,9 @@ function Disable-TvPackages($b) {
         if ($n -notmatch '^[A-Za-z0-9._]+$') { $results += @{name = $n; ok = $false; command = $cmd; output = $Msg.E_BADNAME }; continue }
         if ($S.Pkgs -notcontains $n) { $results += @{name = $n; ok = $false; command = $cmd; output = $Msg.E_NOTINSTALLED }; continue }
         if ($S.Protected.Contains($n)) { $results += @{name = $n; ok = $false; command = $cmd; output = $Msg.E_PROTECTED }; continue }
+        if (($S.ThirdParty -notcontains $n) -and ($AllowDisable -notcontains $n)) {
+            $results += @{name = $n; ok = $false; command = $cmd; output = $Msg.E_SYSTEM }; continue
+        }
         $out = (Invoke-TvShell $cmd) -join ' '
         $ok = $out -match 'disabled'
         if ($ok) { $done += $n }
@@ -252,11 +294,12 @@ function Restore-Journal($b) {
     }
     'rolled back' | Set-Content (Join-Path (Split-Path $full) 'rolledback.flag') -Encoding UTF8
     Update-TvStates
+    New-ProtectedSet
     @{ results = $results }
 }
 function Disconnect-Tv {
     if ($S.Adb) { Invoke-Adb @('disconnect') | Out-Null }
-    $S.Device = $null; $S.Info = $null; $S.Pkgs = @(); $S.Enabled = @(); $S.Disabled = @(); $S.WorkDir = $null
+    $S.Device = $null; $S.Info = $null; $S.Pkgs = @(); $S.Enabled = @(); $S.Disabled = @(); $S.ThirdParty = @(); $S.WorkDir = $null
     $S.Protected = New-Object 'System.Collections.Generic.HashSet[string]'
     @{ ok = $true }
 }
@@ -276,11 +319,7 @@ function Send-File($ctx, [string]$path) {
     $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length); $ctx.Response.Close()
 }
 
-if (-not (Test-Path (Join-Path $Web 'index.html'))) {
-    Write-Host $Msg.E_WEB -ForegroundColor Red
-    Read-Host $Msg.pressEnter; exit 1
-}
-
+if (-not (Test-Path (Join-Path $Web 'index.html'))) { Write-Host $Msg.E_WEB -ForegroundColor Red; Read-Host $Msg.pressEnter; exit 1 }
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add('http://localhost:8765/')
 try { $listener.Start() } catch { Write-Host $Msg.portBusy -ForegroundColor Red; Read-Host $Msg.pressEnter; exit 1 }
@@ -305,7 +344,7 @@ try {
                     '/api/state' { Get-State }
                     '/api/adb' { Initialize-Adb; @{ ok = $true; path = $S.Adb; version = (Invoke-Adb @('version')) } }
                     '/api/connect' { Connect-Tv $body }
-                    '/api/packages' { Test-Device; @{ items = $S.Pkgs; enabled = $S.Enabled; disabled = $S.Disabled; protected = @($S.Protected); platform = $S.Platform; device = $S.Info } }
+                    '/api/packages' { Test-Device; @{ items = $S.Pkgs; enabled = $S.Enabled; disabled = $S.Disabled; thirdParty = $S.ThirdParty; protected = @($S.Protected); platform = $S.Platform; device = $S.Info } }
                     '/api/diag' { Get-TvDiag }
                     '/api/disable' { Disable-TvPackages $body }
                     '/api/enable' { Enable-TvPackages $body }
