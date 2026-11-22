@@ -1,0 +1,230 @@
+/* База знаний: выгрузка неизвестных пакетов и импорт описаний.
+   Наследует графитовую палитру style.css, добавляет только свои компоненты. */
+.kb-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px
+}
+
+.kb-stat {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    box-shadow: var(--shadow)
+}
+
+.kb-stat .v {
+    font-size: 22px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em
+}
+
+.kb-stat .l {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 2px;
+    line-height: 1.4
+}
+
+.kb-stat.accent .v {
+    color: var(--accent-2)
+}
+
+.kb-stat.warn .v {
+    color: #DDB472
+}
+
+.kb-stat.ok .v {
+    color: #7FC49C
+}
+
+.kb-tools {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line)
+}
+
+.kb-tools .search {
+    flex: 1;
+    min-width: 200px
+}
+
+.kb-row {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto auto 30px;
+    gap: 12px;
+    align-items: center;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--line);
+    transition: background .14s
+}
+
+.kb-row:last-child {
+    border-bottom: 0
+}
+
+.kb-row:hover {
+    background: var(--surface-2)
+}
+
+.kb-row .r-check input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer
+}
+
+.kb-name {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text);
+    word-break: break-all
+}
+
+.kb-guess {
+    font-size: 10.5px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--dim);
+    border: 1px dashed var(--line-2);
+    border-radius: 4px;
+    padding: 2px 7px;
+    white-space: nowrap
+}
+
+.kb-guess.system {
+    color: #C98F88;
+    border-color: rgba(191, 74, 64, .35)
+}
+
+.kb-guess.ads {
+    color: #DDB472;
+    border-color: rgba(192, 138, 46, .35)
+}
+
+.kb-run {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--teal);
+    white-space: nowrap
+}
+
+.kb-run::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--teal)
+}
+
+.kb-textarea {
+    width: 100%;
+    min-height: 150px;
+    resize: vertical;
+    background: var(--bg-2);
+    border: 1px solid var(--line-2);
+    border-radius: 6px;
+    padding: 11px 12px;
+    font: 12px/1.6 var(--mono);
+    color: var(--text-2)
+}
+
+.kb-textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-wash)
+}
+
+.kb-import-actions {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    margin-top: 11px;
+    flex-wrap: wrap
+}
+
+#kb-import-msg {
+    margin-top: 11px;
+    display: grid;
+    gap: 7px
+}
+
+.kb-custom-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto 30px;
+    gap: 12px;
+    align-items: center;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--line)
+}
+
+.kb-custom-row:last-child {
+    border-bottom: 0
+}
+
+.kb-custom-row .t {
+    font-size: 12.5px;
+    color: var(--text-2)
+}
+
+.kb-custom-row .n {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    word-break: break-all
+}
+
+.kb-empty {
+    padding: 26px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px
+}
+
+.kb-empty svg {
+    width: 24px;
+    height: 24px;
+    color: var(--dim);
+    margin-bottom: 8px
+}
+
+.kb-prompt-pre {
+    background: #080B0F;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px;
+    font: 11.5px/1.6 var(--mono);
+    color: var(--text-2);
+    max-height: 340px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 12px 0
+}
+
+@media (max-width:900px) {
+    .kb-row {
+        grid-template-columns: 24px minmax(0, 1fr) 30px
+    }
+
+    .kb-row .kb-guess,
+    .kb-row .kb-run {
+        display: none
+    }
+
+    .kb-custom-row {
+        grid-template-columns: minmax(0, 1fr) 30px
+    }
+
+    .kb-custom-row .pill,
+    .kb-custom-row .kb-guess {
+        display: none
+    }
+}

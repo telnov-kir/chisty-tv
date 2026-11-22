@@ -1,258 +1,335 @@
+/* ЧИСТЫЙ ТВ · база знаний о пакетах.
+   P(name, label, cat, risk, verdict, what, gain, loss, src)
+   verdict: safe | optional | caution | forbidden
+  风险 risk: low | medium | high | critical
+   Источники: habr.com/ru/articles/1097472, темы 4PDA, реальный слепок TCL G07 (RTD2851A, Google TV 11). */
 window.CTV_DATA = (() => {
     const SRC = { habr: 'https://habr.com/ru/articles/1097472/', pda: 'https://4pda.to/forum/index.php?showforum=876' };
-    const P = (name, label, cat, act, risk, note, src) => ({ name, label, cat, act, risk, note, src: src || null });
+    const CATS = ['ads', 'telemetry', 'acr', 'update', 'bloat', 'perf', 'media', 'apps', 'system', 'unknown'];
+    const RISKS = ['low', 'medium', 'high', 'critical'];
+    const VERDICTS = ['safe', 'optional', 'caution', 'forbidden'];
+    const ACT2V = { disable: 'safe', ask: 'optional', never: 'forbidden' };
+    const converted = [];
+
+    function P(name, label, cat, a4, a5, a6, a7, a8, a9) {
+        const c = CATS.includes(cat) ? cat : 'unknown';
+        if (a8 === undefined && ACT2V[a4]) {           // старый формат: act, risk, note
+            converted.push(name);
+            const note = String(a6 || 'Описание требует уточнения.');
+            return {
+                name, label, cat: c, risk: RISKS.includes(a5) ? a5 : 'medium', verdict: ACT2V[a4],
+                what: note, gain: 'См. описание.', loss: note, src: a7 || null, converted: true
+            };
+        }
+        return {
+            name, label, cat: c,
+            risk: RISKS.includes(a4) ? a4 : 'medium',
+            verdict: VERDICTS.includes(a5) ? a5 : 'caution',
+            what: String(a6 || 'Назначение уточняется.'),
+            gain: String(a7 || 'Неизвестно.'),
+            loss: String(a8 || 'Последствия неизвестны: проверь перед отключением.'),
+            src: a9 || null
+        };
+    }
 
     const platforms = {
         identify: {
-            title: 'Как определить систему', code: '?', color: '#c6ff4d', vendors: 'Начни отсюда, если не знаешь ОС',
+            title: 'Как определить систему', code: '?', vendors: 'Начни отсюда, если не знаешь ОС',
             steps: [
-                { t: 'Открой сведения о ТВ', b: ['Настройки → Об устройстве (Google TV: Настройки → Система → Об устройстве).', 'Ищи «Версия Android», «Сборка», «Яндекс ТВ», «Салют ТВ», «MIUI TV».'] },
-                { t: 'Сопоставь с платформой', b: ['Android TV / Google TV → «Google TV / Android TV». TCL и iFFALCON на Google TV — туда же.', 'Яндекс ТВ (DEXP, Hartens, Leff, Hyundai, Novex, Starwind) → «Яндекс ТВ».', 'Салют ТВ / Sber → «Салют ТВ». MIUI TV / Mi TV → «Xiaomi».', 'Tizen (Samsung) / webOS (LG) → метод НЕ подходит, смотри блок ниже.'] },
-                { t: 'Запомни точную модель', b: ['Настройки → Об устройстве → Модель. Понадобится для темы на 4PDA.'] }]
+                { t: 'Открой сведения о телевизоре', b: ['Настройки → Об устройстве (Google TV: Настройки → Система → Об устройстве).', 'Ищи строки «Версия Android», «Сборка», «Яндекс ТВ», «Салют ТВ», «MIUI TV».'] },
+                { t: 'Сопоставь с платформой', b: ['Android TV / Google TV — карточка «Google TV». TCL и iFFALCON на Google TV — туда же.', 'Яндекс ТВ (DEXP, Hartens, Leff, Hyundai, Novex, Starwind) — «Яндекс ТВ».', 'Салют ТВ / Sber — «Салют ТВ». MIUI TV / Mi TV — «Xiaomi».', 'Tizen (Samsung) и webOS (LG) этим методом не поддерживаются.'] },
+                { t: 'Запиши точную модель', b: ['Настройки → Об устройстве → Модель. По ней ищется тема на 4PDA и сверяются имена пакетов.'] }]
         },
         googletv: {
-            title: 'Google TV / Android TV', code: 'G', color: '#38c8ff', vendors: 'Sony · Philips · TCL · iFFALCON · Chromecast · Shield',
+            title: 'Google TV / Android TV', code: 'G', vendors: 'Sony · Philips · TCL · iFFALCON · Chromecast · Shield',
             steps: [
-                { t: 'Режим разработчика', b: ['Настройки → Система → Об устройстве → «Сборка» → 7 раз OK.', 'На части ТВ: Настройки → Устройство → Об устройстве → Сборка.'] },
-                { t: 'Отладка', b: ['Настройки → Система → Для разработчиков → «Отладка по USB» → Вкл.', 'Обычно этого достаточно: порт 5555 откроется сам.', 'Есть «Отладка по сети» — включи и её.'] },
-                { t: 'Android 11+: беспроводная отладка', b: ['Для разработчиков → «Беспроводная отладка» → Вкл.', '«Подключение с помощью кода сопряжения» → ip:port и 6-значный код.', 'В форме включи режим «с кодом». После сопряжения введи ip:port с ГЛАВНОГО экрана отладки (порт другой).'] },
-                { t: 'IP телевизора', b: ['Настройки → Сеть и интернет → выбранная сеть → Сведения → IPv4-адрес.', 'Или список клиентов в роутере.'] },
-                { t: 'Подтверди ПК', b: ['На экране ТВ «Разрешить отладку?» → «Всегда разрешать» → ОК.'] }]
+                { t: 'Включи режим разработчика', b: ['Настройки → Система → Об устройстве → пункт «Сборка» → 7 раз OK.', 'На части телевизоров путь: Настройки → Устройство → Об устройстве → Сборка.'] },
+                { t: 'Включи отладку', b: ['Настройки → Система → Для разработчиков → «Отладка по USB» → Вкл.', 'Обычно этого достаточно: сетевой порт 5555 открывается автоматически.', 'Если есть отдельный пункт «Отладка по сети» — включи и его.'] },
+                { t: 'Android 11 и новее: отладка с кодом', b: ['Для разработчиков → «Беспроводная отладка» → Вкл.', 'Открой «Подключение с помощью кода сопряжения»: там ip:port и шестизначный код.', 'В форме включи режим «с кодом». После сопряжения укажи ip:port с главного экрана отладки — порт там другой.'] },
+                { t: 'Узнай IP телевизора', b: ['Настройки → Сеть и интернет → выбранная сеть → Сведения → IPv4-адрес.', 'Либо посмотри список клиентов в веб-интерфейсе роутера.'] },
+                { t: 'Подтверди компьютер', b: ['При первом подключении появится запрос «Разрешить отладку?».', 'Поставь «Всегда разрешать с этого компьютера» и нажми ОК.'] }]
         },
         yandex: {
-            title: 'Яндекс ТВ', code: 'Я', color: '#ffb02e', vendors: 'DEXP · Hartens · Leff · Hyundai · Novex · Starwind (CVTE)',
+            title: 'Яндекс ТВ', code: 'Я', vendors: 'DEXP · Hartens · Leff · Hyundai · Novex · Starwind (платы CVTE)',
             steps: [
-                { t: 'Режим разработчика', b: ['Настройки → Об устройстве → 7 раз «Сборка».', 'Для разработчиков → «Отладка по USB» → Вкл.'] },
-                { t: 'Если пункта нет (прошивки 2025+, CVTE)', b: ['Зажми «Меню» на пульте ~1 сек → сервисное меню.', 'Стрелки: ← ↑ ← ↑ →, затем «Назад».', 'Other options → ADB Mode → On.'], w: 'Больше в сервисном меню НИЧЕГО не трогай: Panel Type, LVDS, Shipping Init = чёрный экран.' },
-                { t: 'IP и подтверждение', b: ['Настройки → Сеть → сведения → IPv4.', 'Подтверди RSA на экране ТВ.'] },
-                { t: 'Помни про OTA', b: ['Обновление прошивки возвращает рекламные плагины. После OTA повтори чистку.'] }]
+                { t: 'Включи режим разработчика', b: ['Настройки → Об устройстве → 7 раз «Сборка».', 'Настройки → Для разработчиков → «Отладка по USB» → Вкл.'] },
+                { t: 'Если пункта отладки нет', b: ['На прошивках 2025+ с платами CVTE пункт скрыт. Зажми «Меню» на пульте примерно на секунду.', 'Набери стрелками: влево, вверх, влево, вверх, вправо, затем «Назад».', 'Other options → ADB Mode → On.'], w: 'В сервисном меню CVTE больше ничего не трогай: Panel Type, LVDS и Shipping Init дают чёрный экран.' },
+                { t: 'IP и подтверждение', b: ['Настройки → Сеть → сведения о подключении → IPv4-адрес.', 'Подтверди RSA-ключ на экране телевизора.'] },
+                { t: 'Помни про обновления', b: ['OTA-обновление прошивки возвращает рекламные плагины. После обновления прогони чистку повторно.'] }]
         },
         sber: {
-            title: 'Салют ТВ', code: 'С', color: '#3dffa8', vendors: 'Sber · СберDevices',
+            title: 'Салют ТВ', code: 'С', vendors: 'Sber · СберDevices',
             steps: [
-                { t: 'Sber Studio', b: ['studio.sberdevices.ru → вход в Сбер ID. Официальный способ включить ADB.'] },
-                { t: 'ID устройства', b: ['На ТВ: Настройки → Об устройстве → ID устройства.'] },
-                { t: 'Включи ADB', b: ['В Sber Studio добавь устройство по ID и включи отладку.'], w: 'VPN на ПК выключен: он не должен перехватывать локальные маршруты.' },
-                { t: 'IP и подключение', b: ['Настройки → Сеть → сведения → IPv4. Введи в форму.'] }]
+                { t: 'Открой Sber Studio', b: ['studio.sberdevices.ru → вход по Сбер ID. Официальный способ включить ADB на Салют ТВ.'] },
+                { t: 'Узнай ID устройства', b: ['На телевизоре: Настройки → Об устройстве → ID устройства.'] },
+                { t: 'Включи отладку', b: ['В Sber Studio добавь устройство по ID и включи для него ADB.'], w: 'VPN на компьютере должен быть выключен: он не должен перехватывать маршруты локальной сети.' },
+                { t: 'IP и подключение', b: ['Настройки → Сеть → сведения о подключении → IPv4-адрес. Введи его в форму.'] }]
         },
         xiaomi: {
-            title: 'Xiaomi Mi TV', code: 'MI', color: '#ff3d5e', vendors: 'Mi TV · Redmi TV · Mi TV Stick',
+            title: 'Xiaomi Mi TV', code: 'MI', vendors: 'Mi TV · Redmi TV · Mi TV Stick',
             steps: [
                 { t: 'Режим разработчика', b: ['Настройки → Об устройстве → 7 раз «Сборка».'] },
-                { t: 'Отладка', b: ['Для разработчиков → «Отладка по USB» → Вкл; есть «Отладка по сети» — включи.'] },
-                { t: 'IP и подтверждение', b: ['Настройки → Сеть → состояние → IPv4. Подтверди RSA.'] }]
+                { t: 'Отладка', b: ['Для разработчиков → «Отладка по USB» → Вкл. Если есть «Отладка по сети» — включи.'] },
+                { t: 'IP и подтверждение', b: ['Настройки → Сеть → состояние подключения → IPv4-адрес.', 'Подтверди RSA-ключ на экране телевизора.'] }]
         },
         tcl: {
-            title: 'TCL / iFFALCON', code: 'TCL', color: '#8b7bff', vendors: 'TCL · iFFALCON · Thomson (Android/Google TV)',
+            title: 'TCL / iFFALCON', code: 'TCL', vendors: 'TCL · iFFALCON · Thomson на Android TV и Google TV',
             steps: [
-                { t: 'Режим разработчика и отладка', b: ['Настройки → Об устройстве (или Система → Об устройстве) → 7 раз «Сборка».', 'Для разработчиков → «Отладка по USB» → Вкл.'] },
-                { t: 'IP и подтверждение', b: ['Настройки → Сеть → сведения → IPv4. Подтверди RSA на экране.'], w: 'На TCL много системных пакетов com.tcl.* — программа блокирует их по умолчанию. Отключай только то, что помечено как разрешённое.' }]
+                { t: 'Режим разработчика и отладка', b: ['Настройки → Система → Об устройстве → 7 раз «Сборка».', 'Для разработчиков → «Отладка по USB» → Вкл.'] },
+                { t: 'IP и подтверждение', b: ['Настройки → Сеть → сведения о подключении → IPv4-адрес.', 'Подтверди RSA-ключ на экране ТВ.'], w: 'На TCL много системных пакетов com.tcl.*. В обычном режиме они заблокированы: отключай только помеченные как разрешённые.' },
+                { t: 'Телеметрия TCL живёт в настройках', b: ['Отключение пакетов не выключает сбор данных самой прошивкой.', 'Открой «Диагностику» → блок «Приватность» и выключи диагностику и UX-программу TCL.'] }]
         },
         haier: {
-            title: 'Haier / CVTE', code: 'H', color: '#ff4dd8', vendors: 'Haier · Candy · платы CVTE/Cultraview',
+            title: 'Haier / CVTE', code: 'H', vendors: 'Haier · Candy · платы CVTE и Cultraview',
             steps: [
-                { t: 'Отладка', b: ['Настройки → Об устройстве → 7 раз «Сборка» → «Отладка по USB».', 'Нет пункта — сервисное меню CVTE: зажать «Меню» → ← ↑ ← ↑ → → «Назад» → ADB Mode → On.'], w: 'com.cvte.tv.hkcfac нельзя даже запускать: заводской режим, умирают Input и HDMI-CEC.' },
-                { t: 'IP и подтверждение', b: ['Настройки → Сеть → сведения → IPv4. Подтверди RSA.'] }]
+                { t: 'Отладка', b: ['Настройки → Об устройстве → 7 раз «Сборка» → «Отладка по USB».', 'Если пункта нет: зажми «Меню» → влево, вверх, влево, вверх, вправо → «Назад» → ADB Mode → On.'], w: 'com.cvte.tv.hkcfac нельзя даже запускать: включается заводской режим, пропадают Input и HDMI-CEC.' },
+                { t: 'IP и подтверждение', b: ['Настройки → Сеть → сведения → IPv4-адрес. Подтверди RSA-ключ на экране ТВ.'] }]
         }
     };
 
-    /* ЯДРО СИСТЕМЫ — отключение запрещено сервером. note = что сломается. */
     const core = [
-        P('android', 'Ядро системы Android', 'system', 'never', 'critical', 'Отключится всё: интерфейс, запуск приложений, возможна невозможность загрузки ТВ.'),
-        P('com.android.shell', 'Оболочка ADB (shell)', 'system', 'never', 'critical', 'Программа потеряет связь с телевизором, откат станет невозможен без сброса до заводских.'),
-        P('com.android.externalstorage', 'Доступ к USB-накопителям', 'system', 'never', 'critical', 'Флешки и внешние диски перестанут читаться.'),
-        P('com.android.permissioncontroller', 'Выдача разрешений приложениям', 'system', 'never', 'critical', 'Приложения не смогут получить доступ к памяти, сети, микрофону.'),
-        P('com.google.android.permissioncontroller', 'Выдача разрешений (Google)', 'system', 'never', 'critical', 'То же: диалоги разрешений перестанут появляться.'),
-        P('com.android.keychain', 'Хранилище ключей и сертификатов', 'system', 'never', 'critical', 'Сломаются VPN, Wi-Fi с сертификатами, часть HTTPS-соединений.'),
-        P('com.android.se', 'Secure Element', 'system', 'never', 'critical', 'DRM и защищённые платёжные операции.'),
-        P('com.android.proxyhandler', 'Системный прокси', 'system', 'never', 'critical', 'Часть приложений потеряет доступ в интернет.'),
-        P('com.android.pacprocessor', 'Автонастройка прокси (PAC)', 'system', 'never', 'high', 'Автоматическая конфигурация прокси в сети.'),
-        P('com.android.captiveportallogin', 'Вход в публичные Wi-Fi', 'system', 'never', 'high', 'Не откроется страница авторизации в отеле/кафе.'),
-        P('com.android.networkstack.inprocess', 'Сетевой стек Android', 'system', 'never', 'critical', 'Пропадёт сеть и Wi-Fi.'),
-        P('com.android.networkstack.permissionconfig', 'Разрешения сетевого стека', 'system', 'never', 'critical', 'Сетевые разрешения перестанут выдаваться.'),
-        P('com.android.networkstack.tethering.inprocess', 'Раздача интернета', 'system', 'never', 'high', 'Точка доступа и режим модема.'),
-        P('com.android.tethering.overlay', 'Оверлей раздачи интернета', 'system', 'never', 'high', 'Настройки раздачи интернета.'),
-        P('com.android.tethering.overlay.gsi', 'Оверлей раздачи (GSI)', 'system', 'never', 'high', 'Настройки раздачи интернета.'),
-        P('com.android.hotspot2.osulogin', 'Hotspot 2.0', 'system', 'never', 'medium', 'Автоподключение к публичным Wi-Fi.'),
-        P('com.android.inputdevices', 'Устройства ввода', 'system', 'never', 'critical', 'Пульт, клавиатура и мышь могут перестать работать.'),
-        P('com.android.statementservice', 'Проверка ссылок между приложениями', 'system', 'never', 'high', 'Ссылки перестанут открываться в нужных приложениях.'),
-        P('com.android.sharedstoragebackup', 'Бэкап общего хранилища', 'system', 'never', 'medium', 'Резервное копирование файлов.'),
-        P('com.android.localtransport', 'Локальный транспорт бэкапа', 'system', 'never', 'medium', 'Локальное резервное копирование.'),
-        P('com.android.backupconfirm', 'Подтверждение бэкапа', 'system', 'never', 'medium', 'Диалог подтверждения резервного копирования.'),
-        P('com.android.dynsystem', 'Динамические обновления системы', 'system', 'never', 'high', 'Установка системных образов DSU.'),
-        P('com.android.htmlviewer', 'Просмотр HTML-файлов', 'system', 'never', 'low', 'Открытие локальных HTML-файлов.'),
-        P('com.android.soundpicker', 'Выбор системных звуков', 'system', 'never', 'low', 'Выбор мелодий и звуков уведомлений.'),
-        P('com.android.printspooler', 'Служба печати', 'system', 'never', 'low', 'Печать с телевизора.'),
-        P('com.android.deskclock', 'Часы и будильник', 'system', 'never', 'low', 'Штатные часы и будильники.'),
-        P('com.android.dreams.basic', 'Базовая заставка', 'system', 'never', 'low', 'Стандартная заставка Android.'),
-        P('com.android.wallpaperbackup', 'Резервная копия обоев', 'system', 'never', 'low', 'Восстановление обоев.'),
-        P('com.android.wallpaper.livepicker', 'Выбор живых обоев', 'system', 'never', 'low', 'Установка живых обоев.'),
-        P('com.android.vpndialogs', 'Разрешение на VPN', 'system', 'never', 'critical', 'VPN-приложения перестанут подключаться: не появится окно разрешения.'),
-        P('com.android.companiondevicemanager', 'Сопряжение с устройствами', 'system', 'never', 'medium', 'Подключение часов, наушников и аксессуаров.'),
-        P('com.android.cts.ctsshim', 'Заглушка CTS-тестов', 'system', 'never', 'low', 'Служебный компонент совместимости.'),
-        P('com.android.cts.priv.ctsshim', 'Заглушка CTS (priv)', 'system', 'never', 'low', 'Служебный компонент совместимости.'),
-        P('com.google.android.gsf', 'Google Services Framework', 'system', 'never', 'critical', 'Аккаунт Google, Play Маркет и пуш-уведомления перестанут работать.'),
-        P('com.google.android.webview', 'WebView (встроенный браузер)', 'system', 'never', 'critical', 'Веб-экраны внутри приложений: вход, оплата, справки.'),
-        P('com.tcl.android.webview', 'WebView (TCL)', 'system', 'never', 'critical', 'Веб-экраны внутри приложений на платах TCL.'),
-        P('com.google.android.tts', 'Синтез речи (TTS)', 'system', 'never', 'high', 'Озвучка интерфейса и голосовые ответы.'),
-        P('com.google.android.marvin.talkback', 'TalkBack — озвучка экрана', 'system', 'never', 'high', 'Экранная читалка для слабовидящих.'),
-        P('com.google.android.syncadapters.calendar', 'Синхронизация календаря', 'system', 'never', 'low', 'Синхронизация календаря Google.'),
-        P('com.google.android.tv.remote.service', 'Пульт из приложения Google TV', 'system', 'never', 'high', 'Управление телевизором со телефона перестанет работать.'),
-        P('com.google.android.tv.frameworkpackagestubs', 'Заглушки системных пакетов TV', 'system', 'never', 'high', 'Системные вызовы Android TV.'),
-        P('com.google.android.sss.authbridge', 'Мост авторизации Google', 'system', 'never', 'critical', 'Вход в аккаунт Google.'),
-        P('com.google.android.apps.mediashell', 'Chromecast built-in', 'system', 'never', 'high', 'Трансляция видео с телефона на телевизор.'),
-        P('com.google.android.apps.nbu.smartconnect.tv', 'Smart Connect', 'system', 'never', 'medium', 'Сопряжение и быстрое подключение устройств.'),
-        P('com.google.android.ext.services', 'Расширения системных сервисов', 'system', 'never', 'high', 'Системные расширения Android.'),
-        P('com.google.android.ext.shared', 'Общие системные расширения', 'system', 'never', 'high', 'Общие библиотеки системных сервисов.'),
-        P('com.google.android.overlay.modules.ext.services', 'Оверлей системных расширений', 'system', 'never', 'high', 'Конфигурация системных модулей.'),
-        P('com.google.android.overlay.modules.modulemetadata.forframework', 'Метаданные модулей (framework)', 'system', 'never', 'high', 'Конфигурация модулей системы.'),
-        P('com.google.android.overlay.modules.permissioncontroller', 'Оверлей разрешений', 'system', 'never', 'high', 'Конфигурация выдачи разрешений.'),
-        P('com.google.android.overlay.modules.permissioncontroller.forframework', 'Оверлей разрешений (framework)', 'system', 'never', 'high', 'Конфигурация выдачи разрешений.'),
-        P('com.google.android.modulemetadata', 'Метаданные модулей', 'system', 'never', 'high', 'Обновляемые модули системы.'),
-        P('com.google.android.onetimeinitializer', 'Первичная инициализация', 'system', 'never', 'high', 'Первичная настройка компонентов.'),
-        P('com.google.android.tungsten.setupwraith', 'Мастер первичной настройки', 'system', 'never', 'critical', 'Настройка телевизора после сброса.'),
-        P('com.tcl.system.server', 'Системный сервер TCL', 'system', 'never', 'critical', 'Ядро оболочки TCL: интерфейс и службы телевизора.'),
-        P('com.tcl.tv', 'Эфирное ТВ TCL', 'system', 'never', 'critical', 'Просмотр эфирных каналов и работа тюнера.'),
-        P('com.tcl.ttvs', 'ТВ-сервис TCL', 'system', 'never', 'critical', 'Служба телевидения.'),
-        P('com.tcl.guard', 'Служба защиты TCL', 'system', 'never', 'high', 'Системные проверки безопасности.'),
-        P('com.tcl.initsetup', 'Первичная настройка TCL', 'system', 'never', 'critical', 'Настройка телевизора после сброса.'),
-        P('com.tcl.autopair', 'Автосопряжение пульта', 'system', 'never', 'critical', 'Пульт перестанет подключаться по Bluetooth.'),
-        P('com.tcl.micmanager', 'Менеджер микрофона', 'system', 'never', 'high', 'Голосовое управление и микрофон пульта.'),
-        P('com.tcl.tv.tclhome_passive', 'Домашний экран TCL', 'system', 'never', 'critical', 'Главный экран телевизора.'),
-        P('com.tcl.channelpus', 'Каналы TCL', 'system', 'never', 'high', 'Список и переключение каналов.'),
-        P('com.tcl.t_solo', 'Служба TCL Solo', 'system', 'never', 'high', 'Системная служба платформы TCL.'),
-        P('com.tcl.ui_mediaCenter', 'Медиацентр TCL', 'system', 'never', 'high', 'Просмотр файлов с флешки и по сети через штатный медиацентр.'),
-        P('com.tcl.suspension', 'Меню источников (HDMI)', 'system', 'never', 'critical', 'Пропадёт меню источников — HDMI не переключить.', 'habr'),
-        P('com.google.android.apps.tv.launcherx', 'Лаунчер Google TV', 'system', 'never', 'critical', 'Главный экран. Меняй на Projectivy, не отключай.'),
-        P('com.google.android.gms', 'Сервисы Google Play', 'system', 'never', 'critical', 'DRM, пуш, аккаунты, работа большинства приложений.'),
-        P('com.android.vending', 'Google Play Маркет', 'system', 'never', 'high', 'Установка и обновление приложений.'),
-        P('com.android.location.fused', 'Служба геолокации', 'system', 'never', 'critical', 'Циклическая перезагрузка.', 'habr'),
-        P('com.google.android.leanback.ime', 'Клавиатура Leanback', 'system', 'never', 'critical', 'Экранная клавиатура Android TV.'),
-        P('com.tcl.inputmethod.international', 'Клавиатура TCL', 'system', 'never', 'critical', 'Экранная клавиатура: нечем будет вводить текст.'),
-        P('com.yandex.tv.services.platform', 'Платформенные сервисы Яндекс ТВ', 'system', 'never', 'critical', 'Recovery и чёрный экран.', 'habr'),
-        P('com.yandex.tv.live', 'Эфир и входы HDMI (Яндекс)', 'system', 'never', 'critical', 'Перестают переключаться входы и HDMI.', 'habr'),
-        P('ru.yandex.androidkeyboard.tv', 'Клавиатура Яндекс ТВ', 'system', 'never', 'critical', 'Единственная клавиатура в системе.', 'habr'),
-        P('com.yandex.tv.launcher', 'Лаунчер Яндекс ТВ', 'system', 'never', 'critical', 'Главный экран.'),
-        P('ru.sberdevices.starlauncher', 'Лаунчер Салют', 'system', 'never', 'critical', 'Recovery-петля даже со сторонним лаунчером.', 'habr'),
-        P('com.cvte.tv.hkcfac', 'Заводской режим CVTE', 'system', 'never', 'critical', 'Нельзя даже запускать: заводской режим, умирают Input и HDMI-CEC.', 'habr'),
-        P('com.mitv.tvhome', 'Лаунчер Mi TV', 'system', 'never', 'critical', 'Главный экран.'),
-        P('com.android.inputmethod.latin', 'Клавиатура AOSP', 'system', 'never', 'critical', 'Экранная клавиатура.')
+        P('android', 'Ядро системы Android', 'system', 'critical', 'forbidden', 'Главный системный пакет: ресурсы, темы и базовые компоненты интерфейса.', 'Ничего. Это не мусор.', 'Перестанет работать всё, вероятна невозможность загрузки телевизора.'),
+        P('com.android.shell', 'Оболочка ADB', 'system', 'critical', 'forbidden', 'Компонент, от имени которого выполняются команды отладки.', 'Ничего. Это канал управления.', 'Программа потеряет связь с ТВ, откат станет невозможен без сброса до заводских.'),
+        P('com.android.externalstorage', 'Доступ к USB-накопителям', 'system', 'critical', 'forbidden', 'Провайдер внешних накопителей: монтирует флешки и USB-диски.', 'Ничего заметного.', 'Флешки и внешние диски перестанут читаться всеми приложениями.'),
+        P('com.android.permissioncontroller', 'Выдача разрешений', 'system', 'critical', 'forbidden', 'Диалоги доступа к памяти, сети, микрофону и геолокации.', 'Ничего.', 'Приложения не смогут получить разрешения и начнут падать.'),
+        P('com.google.android.permissioncontroller', 'Выдача разрешений (Google)', 'system', 'critical', 'forbidden', 'Вариант контроллера разрешений от Google.', 'Ничего.', 'Диалоги разрешений исчезнут, приложения перестанут работать корректно.'),
+        P('com.android.keychain', 'Хранилище ключей и сертификатов', 'system', 'critical', 'forbidden', 'Системное хранилище доверенных сертификатов.', 'Ничего.', 'Сломаются VPN, Wi-Fi с сертификатами и часть HTTPS-соединений.'),
+        P('com.android.certinstaller', 'Установка сертификатов', 'system', 'high', 'forbidden', 'Установщик сертификатов из файлов и меню безопасности.', 'Ничего заметного.', 'Нельзя будет установить новый сертификат (VPN, корпоративный Wi-Fi); уже установленные продолжат работать.'),
+        P('com.android.se', 'Secure Element', 'system', 'critical', 'forbidden', 'Доступ к защищённому элементу для DRM и платёжных операций.', 'Ничего.', 'Перестанут работать защищённое видео и платёжные функции.'),
+        P('com.android.proxyhandler', 'Системный прокси', 'system', 'critical', 'forbidden', 'Обрабатывает системные настройки прокси для приложений.', 'Ничего.', 'Часть приложений потеряет доступ в интернет.'),
+        P('com.android.pacprocessor', 'Автонастройка прокси (PAC)', 'system', 'high', 'forbidden', 'Читает сценарии автоматической конфигурации прокси.', 'Ничего.', 'Не будет работать автоконфигурация прокси в сети.'),
+        P('com.android.captiveportallogin', 'Вход в публичные Wi-Fi', 'system', 'high', 'forbidden', 'Открывает страницу авторизации в сетях отелей и кафе.', 'Ничего.', 'Не откроется страница входа в публичную Wi-Fi сеть.'),
+        P('com.android.networkstack.inprocess', 'Сетевой стек Android', 'system', 'critical', 'forbidden', 'Получение IP-адреса, DHCP и проверка наличия интернета.', 'Ничего.', 'Пропадёт сеть и Wi-Fi, телевизор перестанет выходить в интернет.'),
+        P('com.android.networkstack.permissionconfig', 'Разрешения сетевого стека', 'system', 'critical', 'forbidden', 'Конфигурация сетевых разрешений.', 'Ничего.', 'Сетевые разрешения перестанут выдаваться.'),
+        P('com.android.networkstack.tethering.inprocess', 'Раздача интернета', 'system', 'high', 'forbidden', 'Режим точки доступа и модема.', 'Ничего.', 'Перестанет работать раздача интернета с телевизора.'),
+        P('com.android.tethering.overlay', 'Оверлей раздачи интернета', 'system', 'high', 'forbidden', 'Настройки раздачи интернета для конкретной прошивки.', 'Ничего.', 'Настройки точки доступа станут недоступны.'),
+        P('com.android.tethering.overlay.gsi', 'Оверлей раздачи (GSI)', 'system', 'high', 'forbidden', 'Вариант оверлея для универсальных образов системы.', 'Ничего.', 'Настройки раздачи интернета станут недоступны.'),
+        P('com.android.hotspot2.osulogin', 'Hotspot 2.0', 'system', 'medium', 'forbidden', 'Автоподключение к публичным сетям Hotspot 2.0.', 'Ничего.', 'Не будет автоподключения к публичным Wi-Fi.'),
+        P('com.android.wifi.resources', 'Ресурсы Wi-Fi', 'system', 'critical', 'forbidden', 'Конфигурационные ресурсы подсистемы Wi-Fi, часть обновляемых модулей сети.', 'Ничего.', 'Wi-Fi может перестать включаться и подключаться к сетям.'),
+        P('com.android.bluetooth', 'Стек Bluetooth', 'system', 'critical', 'forbidden', 'Системная служба Bluetooth: сопряжение пульта, наушников, геймпадов.', 'Ничего: это функция телевизора.', 'Bluetooth-пульт перестанет работать, наушники и геймпады не подключатся.'),
+        P('com.android.inputdevices', 'Устройства ввода', 'system', 'critical', 'forbidden', 'Поддержка пультов, клавиатур и мышей на уровне системы.', 'Ничего.', 'Пульт, клавиатура и мышь могут перестать работать.'),
+        P('com.android.statementservice', 'Проверка ссылок между приложениями', 'system', 'high', 'forbidden', 'Проверяет, какое приложение имеет право открывать ссылку.', 'Ничего.', 'Ссылки перестанут открываться в нужных приложениях.'),
+        P('com.android.sharedstoragebackup', 'Бэкап общего хранилища', 'system', 'medium', 'forbidden', 'Резервное копирование файлов общего хранилища.', 'Ничего.', 'Файлы перестанут попадать в резервную копию.'),
+        P('com.android.localtransport', 'Локальный транспорт бэкапа', 'system', 'medium', 'forbidden', 'Локальное резервное копирование данных приложений.', 'Ничего.', 'Локальный бэкап перестанет выполняться.'),
+        P('com.android.backupconfirm', 'Подтверждение бэкапа', 'system', 'medium', 'forbidden', 'Диалог подтверждения резервного копирования.', 'Ничего.', 'Бэкап нельзя будет подтвердить.'),
+        P('com.android.dynsystem', 'Динамические обновления системы', 'system', 'high', 'forbidden', 'Установка динамических системных образов (DSU).', 'Ничего.', 'Системные обновления образов перестанут устанавливаться.'),
+        P('com.android.htmlviewer', 'Просмотр HTML-файлов', 'system', 'low', 'forbidden', 'Простой просмотрщик локальных HTML-файлов.', 'Пара мегабайт памяти.', 'Локальные HTML-файлы нечем будет открыть.'),
+        P('com.android.soundpicker', 'Выбор системных звуков', 'system', 'low', 'forbidden', 'Диалог выбора мелодии уведомлений.', 'Пара мегабайт памяти.', 'Нельзя будет выбрать системный звук.'),
+        P('com.android.printspooler', 'Служба печати', 'system', 'low', 'forbidden', 'Очередь печати с телевизора.', 'Пара мегабайт памяти.', 'Печать с телевизора перестанет работать.'),
+        P('com.android.deskclock', 'Часы и будильник', 'system', 'low', 'forbidden', 'Штатные часы, таймер и будильники.', 'Несколько мегабайт памяти.', 'Пропадут будильники и таймеры системы.'),
+        P('com.android.dreams.basic', 'Базовая заставка', 'system', 'low', 'forbidden', 'Стандартная экранная заставка Android.', 'Несколько мегабайт памяти.', 'Пропадёт базовая заставка.'),
+        P('com.android.wallpaperbackup', 'Резервная копия обоев', 'system', 'low', 'forbidden', 'Сохраняет и восстанавливает обои.', 'Пара мегабайт памяти.', 'Обои не восстановятся после сброса.'),
+        P('com.android.wallpaper.livepicker', 'Выбор живых обоев', 'system', 'low', 'forbidden', 'Установка живых обоев.', 'Пара мегабайт памяти.', 'Живые обои нельзя будет установить.'),
+        P('com.android.vpndialogs', 'Разрешение на VPN', 'system', 'critical', 'forbidden', 'Системный диалог, разрешающий VPN-приложению перехватывать трафик.', 'Ничего.', 'Ни одно VPN-приложение не сможет подключиться.'),
+        P('com.android.companiondevicemanager', 'Сопряжение с устройствами', 'system', 'medium', 'forbidden', 'Подключение часов, наушников и аксессуаров.', 'Пара мегабайт памяти.', 'Аксессуары перестанут сопрягаться.'),
+        P('com.android.cts.ctsshim', 'Заглушка тестов совместимости', 'system', 'low', 'forbidden', 'Служебный компонент CTS-проверок.', 'Ничего.', 'Нарушится работа проверок совместимости.'),
+        P('com.android.cts.priv.ctsshim', 'Заглушка тестов (привилегированная)', 'system', 'low', 'forbidden', 'Привилегированная часть CTS-заглушек.', 'Ничего.', 'Нарушится работа проверок совместимости.'),
+        P('com.android.providers.calendar', 'Провайдер календаря', 'system', 'high', 'forbidden', 'Системное хранилище календарей и событий.', 'Незначительная экономия памяти.', 'Синхронизация календаря сломается, приложения с обращениями к нему начнут падать.'),
+        P('com.android.providers.contacts', 'Провайдер контактов', 'system', 'high', 'forbidden', 'Хранилище контактов и профилей, связанное с аккаунтами.', 'Незначительная экономия памяти.', 'Пропадёт доступ к контактам, сервисы аккаунтов могут падать.'),
+        P('com.android.providers.downloads', 'Менеджер загрузок', 'system', 'high', 'forbidden', 'Системный провайдер и служба загрузок (DownloadManager).', 'Ничего заметного.', 'Перестанут скачиваться файлы и APK через браузер и приложения.'),
+        P('com.android.providers.media', 'Провайдер медиафайлов', 'system', 'critical', 'forbidden', 'Индекс MediaStore: фото, видео и музыка, включая файлы с USB.', 'Ничего: это доступ к вашим файлам.', 'Приложения перестанут видеть медиафайлы, в том числе с флешки; плееры и галереи начнут падать.'),
+        P('com.android.providers.media.module', 'Провайдер медиа (модуль Android 11)', 'system', 'critical', 'forbidden', 'Обновляемый модуль MediaProvider: сканирование и доступ к медиафайлам.', 'Ничего.', 'Пропадёт доступ к фото, видео и музыке, включая USB-накопители.'),
+        P('com.android.providers.settings', 'Хранилище настроек системы', 'system', 'critical', 'forbidden', 'Провайдер системных настроек: параметры системы и приложений.', 'Ничего.', 'Вероятны циклическая перезагрузка и невозможность загрузки.'),
+        P('com.android.providers.tv', 'Провайдер ТВ-каналов (TIF)', 'system', 'critical', 'forbidden', 'База каналов и программ TV Input Framework.', 'Ничего.', 'Пропадут эфирные каналы и источники, переключение входов сломается.'),
+        P('com.android.providers.userdictionary', 'Пользовательский словарь клавиатуры', 'system', 'medium', 'forbidden', 'Провайдер личных слов, которые клавиатура использует при вводе.', 'Незначительная экономия памяти.', 'Пропадёт словарь; на части прошивок клавиатура падает при вводе текста.'),
+        P('com.android.systemui', 'Системный интерфейс (SystemUI)', 'system', 'critical', 'forbidden', 'Статус-бар, навигация, уведомления, диалог громкости.', 'Ничего.', 'Пропадут громкость, уведомления и навигация; интерфейс станет неуправляемым.'),
+        P('com.android.tv.settings', 'Настройки Android TV', 'system', 'critical', 'forbidden', 'Основное приложение настроек: сеть, экран, звук, приложения, система.', 'Ничего.', 'Меню настроек перестанет открываться; включить отладку заново будет невозможно.'),
+        P('com.android.tv.settings.google.resoverlay', 'Оверлей настроек Google', 'system', 'high', 'forbidden', 'Ресурсный оверлей Google для приложения настроек Android TV.', 'Ничего заметного.', 'В настройках могут исчезнуть пункты, приложение может начать падать.'),
+        P('com.android.tv.settings.vendor.resoverlay', 'Оверлей настроек вендора', 'system', 'high', 'forbidden', 'Вендорный ресурсный оверлей для настроек Android TV.', 'Ничего заметного.', 'Пропадут вендорные пункты настроек, приложение может падать.'),
+        P('com.google.android.gsf', 'Google Services Framework', 'system', 'critical', 'forbidden', 'Каркас сервисов Google: регистрация устройства и push-уведомления.', 'Ничего.', 'Аккаунт Google, Play Маркет и push перестанут работать.'),
+        P('com.google.android.webview', 'WebView', 'system', 'critical', 'forbidden', 'Встроенный браузерный движок для приложений.', 'Ничего.', 'Экраны входа, оплаты и справок внутри приложений перестанут открываться.'),
+        P('com.tcl.android.webview', 'WebView (TCL)', 'system', 'critical', 'forbidden', 'Сборка WebView от TCL для этой прошивки.', 'Ничего.', 'Веб-экраны внутри приложений перестанут открываться.'),
+        P('com.google.android.tts', 'Синтез речи', 'system', 'high', 'forbidden', 'Превращает текст в речь для озвучки интерфейса.', 'Несколько мегабайт памяти.', 'Пропадёт озвучка интерфейса и голосовые ответы.'),
+        P('com.google.android.marvin.talkback', 'TalkBack', 'system', 'high', 'forbidden', 'Экранная читалка для слабовидящих.', 'Несколько мегабайт памяти.', 'Пропадёт озвучка всего, что происходит на экране.'),
+        P('com.google.android.syncadapters.calendar', 'Синхронизация календаря', 'system', 'low', 'forbidden', 'Синхронизирует календарь Google.', 'Пара мегабайт памяти.', 'Календарь перестанет синхронизироваться.'),
+        P('com.google.android.tv.remote.service', 'Пульт из приложения Google TV', 'system', 'high', 'forbidden', 'Служба управления телевизором со смартфона.', 'Несколько мегабайт памяти.', 'Пульт в телефоне перестанет управлять телевизором.'),
+        P('com.google.android.tv.frameworkpackagestubs', 'Заглушки системных пакетов TV', 'system', 'high', 'forbidden', 'Заглушки для системных вызовов Android TV.', 'Ничего.', 'Часть системных вызовов Android TV перестанет выполняться.'),
+        P('com.google.android.sss.authbridge', 'Мост авторизации Google', 'system', 'critical', 'forbidden', 'Связывает приложения с входом в аккаунт Google.', 'Ничего.', 'Вход в аккаунт Google перестанет работать.'),
+        P('com.google.android.apps.mediashell', 'Chromecast built-in', 'system', 'high', 'forbidden', 'Приёмник трансляции видео с телефона.', 'Десятки мегабайт памяти.', 'Трансляция с телефона на телевизор перестанет работать.'),
+        P('com.google.android.apps.nbu.smartconnect.tv', 'Smart Connect', 'system', 'medium', 'forbidden', 'Быстрое сопряжение и подключение устройств.', 'Несколько мегабайт памяти.', 'Быстрое подключение устройств перестанет работать.'),
+        P('com.google.android.ext.services', 'Расширения системных сервисов', 'system', 'high', 'forbidden', 'Системные расширения Android: автозаполнение, проверка текста.', 'Ничего.', 'Часть системных функций перестанет работать.'),
+        P('com.google.android.ext.shared', 'Общие системные расширения', 'system', 'high', 'forbidden', 'Общие библиотеки для системных сервисов.', 'Ничего.', 'Зависимые системные сервисы начнут падать.'),
+        P('com.google.android.overlay.modules.ext.services', 'Оверлей системных расширений', 'system', 'high', 'forbidden', 'Конфигурация системных модулей.', 'Ничего.', 'Конфигурация системных модулей нарушится.'),
+        P('com.google.android.overlay.modules.modulemetadata.forframework', 'Метаданные модулей (framework)', 'system', 'high', 'forbidden', 'Описывает обновляемые модули системы.', 'Ничего.', 'Обновляемые модули системы перестанут определяться.'),
+        P('com.google.android.overlay.modules.permissioncontroller', 'Оверлей разрешений', 'system', 'high', 'forbidden', 'Конфигурация выдачи разрешений.', 'Ничего.', 'Разрешения начнут выдаваться некорректно.'),
+        P('com.google.android.overlay.modules.permissioncontroller.forframework', 'Оверлей разрешений (framework)', 'system', 'high', 'forbidden', 'Конфигурация разрешений на уровне фреймворка.', 'Ничего.', 'Разрешения начнут выдаваться некорректно.'),
+        P('com.google.android.modulemetadata', 'Метаданные модулей', 'system', 'high', 'forbidden', 'Сведения об обновляемых модулях Android.', 'Ничего.', 'Модули системы перестанут обновляться корректно.'),
+        P('com.google.android.onetimeinitializer', 'Первичная инициализация', 'system', 'high', 'forbidden', 'Одноразовая настройка компонентов при первом запуске.', 'Ничего.', 'Компоненты не пройдут первичную настройку.'),
+        P('com.google.android.tungsten.setupwraith', 'Мастер первичной настройки', 'system', 'critical', 'forbidden', 'Экраны настройки телевизора после сброса.', 'Ничего.', 'После сброса телевизор нельзя будет настроить.'),
+        P('com.google.android.inputmethod.latin', 'Клавиатура Gboard', 'system', 'critical', 'forbidden', 'Экранная клавиатура Google для ввода текста.', 'Несколько мегабайт памяти, если активна другая.', 'Если это активная клавиатура, ввод текста станет невозможен: поиск, пароли, логины.'),
+        P('com.google.android.packageinstaller', 'Установщик приложений', 'system', 'critical', 'forbidden', 'Системный установщик APK: диалоги установки и удаления.', 'Ничего.', 'Нельзя будет ставить и обновлять APK, пропадут диалоги установки.'),
+        P('com.google.android.apps.tv.launcherx', 'Лаунчер Google TV', 'system', 'critical', 'forbidden', 'Главный экран со вкладками и рекомендациями. На прошивках TCL без отдельного пакета рекомендаций именно он рисует промо-ленту и держит её в памяти.', 'Много памяти и процессорного времени — но только после замены.', 'Пропадёт главный экран. Сначала установи Projectivy и назначь его главным, потом отключай этот.'),
+        P('com.google.android.gms', 'Сервисы Google Play', 'system', 'critical', 'forbidden', 'Ядро сервисов: аккаунты, push, DRM, местоположение.', 'Много памяти, но ценой всего.', 'Большинство приложений и защищённое видео перестанут работать.'),
+        P('com.android.vending', 'Google Play Маркет', 'system', 'high', 'forbidden', 'Установка и обновление приложений.', 'Десятки мегабайт памяти.', 'Нельзя будет ставить и обновлять приложения.'),
+        P('com.android.location.fused', 'Служба геолокации', 'system', 'critical', 'forbidden', 'Объединённое определение местоположения.', 'Ничего.', 'Циклическая перезагрузка телевизора.', 'habr'),
+        P('com.google.android.leanback.ime', 'Клавиатура Leanback', 'system', 'critical', 'forbidden', 'Экранная клавиатура Android TV.', 'Ничего.', 'Нечем будет вводить текст.'),
+        P('com.android.inputmethod.latin', 'Клавиатура AOSP', 'system', 'critical', 'forbidden', 'Стандартная экранная клавиатура Android.', 'Ничего.', 'Нечем будет вводить текст.'),
+        P('com.tcl.inputmethod.international', 'Клавиатура TCL', 'system', 'critical', 'forbidden', 'Экранная клавиатура этой прошивки, обычно единственная активная.', 'Ничего.', 'Нечем будет вводить текст: поиск, логины и пароли.'),
+        P('com.tcl.system.server', 'Системный сервер TCL', 'system', 'critical', 'forbidden', 'Ядро оболочки TCL: службы телевизора и интерфейса.', 'Ничего.', 'Оболочка телевизора перестанет работать.'),
+        P('com.tcl.tv', 'Эфирное ТВ TCL', 'system', 'critical', 'forbidden', 'Просмотр эфирных каналов и работа тюнера. Приложение помечено как persistent: система поднимает его сразу, force-stop его не убивает.', 'Ничего.', 'Пропадут эфирные каналы и работа антенны. Отключение вступает в силу только после перезагрузки.'),
+        P('com.tcl.ttvs', 'ТВ-сервис TCL', 'system', 'critical', 'forbidden', 'Служба телевидения TCL, держит контейнер com.tcl.ttvs.container в памяти.', 'Ничего.', 'Телевидение перестанет работать.'),
+        P('com.tcl.tvinput', 'ТВ-входы TCL (TIF)', 'system', 'critical', 'forbidden', 'Служба TV Input: тюнер, эфирные каналы и физические входы.', 'Ничего.', 'Пропадут эфирные каналы и HDMI/AV-источники, переключение входов сломается.'),
+        P('com.tcl.providers.config', 'Провайдер конфигурации TCL', 'system', 'high', 'forbidden', 'Хранилище конфигурации платформы TCL: параметры модели и платы.', 'Ничего заметного.', 'Сервисы TCL и часть настроек потеряют конфигурацию и могут начать падать.'),
+        P('com.tcl.settings', 'Настройки TCL', 'system', 'high', 'forbidden', 'Вендорное приложение настроек: изображение, звук, системные параметры.', 'Ничего.', 'Пропадут настройки изображения, звука и системы TCL.'),
+        P('com.tcl.guard', 'Служба защиты TCL', 'system', 'high', 'forbidden', 'Системные проверки безопасности прошивки.', 'Несколько мегабайт памяти.', 'Проверки безопасности перестанут выполняться.'),
+        P('com.tcl.initsetup', 'Первичная настройка TCL', 'system', 'critical', 'forbidden', 'Мастер настройки телевизора после сброса.', 'Ничего.', 'После сброса телевизор нельзя будет настроить.'),
+        P('com.tcl.autopair', 'Автосопряжение пульта', 'system', 'critical', 'forbidden', 'Подключение Bluetooth-пульта.', 'Ничего.', 'Пульт перестанет подключаться.'),
+        P('com.tcl.micmanager', 'Менеджер микрофона', 'system', 'high', 'forbidden', 'Работа микрофона пульта и голосового ввода.', 'Несколько мегабайт памяти.', 'Голосовой ввод и микрофон перестанут работать.'),
+        P('com.tcl.tv.tclhome_passive', 'Домашний экран TCL', 'system', 'critical', 'forbidden', 'Главный экран оболочки TCL.', 'Ничего.', 'Пропадёт главный экран телевизора.'),
+        P('com.tcl.factory.view', 'Заводской режим TCL (интерфейс)', 'system', 'high', 'forbidden', 'Предположительно интерфейс заводского или сервисного меню TCL. Точное назначение по имени не подтверждено.', 'Возможно, закроет случайный вход в заводской режим.', 'Сервисное меню может перестать открываться. Проверь по теме модели, не нужен ли он для сброса.'),
+        P('com.tcl.t_solo', 'Служба TCL Solo', 'system', 'high', 'forbidden', 'Системная служба платформы TCL.', 'Несколько мегабайт памяти.', 'Часть функций платформы TCL перестанет работать.'),
+        P('com.tcl.ui_mediaCenter', 'Медиацентр TCL', 'system', 'high', 'forbidden', 'Штатный просмотр файлов с USB и по сети.', 'Десятки мегабайт памяти.', 'Пропадёт штатный просмотр файлов с флешки.'),
+        P('com.tcl.suspension', 'Меню источников (HDMI)', 'system', 'critical', 'forbidden', 'Всплывающее меню выбора источника сигнала.', 'Ничего.', 'HDMI и другие входы нельзя будет переключить.', 'habr'),
+        P('com.yandex.tv.services.platform', 'Платформенные сервисы Яндекс ТВ', 'system', 'critical', 'forbidden', 'Базовые сервисы оболочки Яндекс ТВ.', 'Ничего.', 'Recovery и чёрный экран.', 'habr'),
+        P('com.yandex.tv.live', 'Эфир и входы HDMI (Яндекс)', 'system', 'critical', 'forbidden', 'Эфирное ТВ и переключение входов.', 'Ничего.', 'Входы и HDMI перестанут переключаться.', 'habr'),
+        P('ru.yandex.androidkeyboard.tv', 'Клавиатура Яндекс ТВ', 'system', 'critical', 'forbidden', 'Единственная экранная клавиатура системы.', 'Ничего.', 'Нечем будет вводить текст.', 'habr'),
+        P('com.yandex.tv.launcher', 'Лаунчер Яндекс ТВ', 'system', 'critical', 'forbidden', 'Главный экран Яндекс ТВ.', 'Ничего.', 'Пропадёт главный экран.'),
+        P('ru.sberdevices.starlauncher', 'Лаунчер Салют', 'system', 'critical', 'forbidden', 'Главный экран Салют ТВ.', 'Ничего.', 'Recovery-петля даже со сторонним лаунчером.', 'habr'),
+        P('com.cvte.tv.hkcfac', 'Заводской режим CVTE', 'system', 'critical', 'forbidden', 'Заводские тесты платы.', 'Ничего.', 'Заводской режим, пропадают Input и HDMI-CEC. Нельзя даже запускать.', 'habr'),
+        P('com.mitv.tvhome', 'Лаунчер Mi TV', 'system', 'critical', 'forbidden', 'Главный экран MIUI TV.', 'Ничего.', 'Пропадёт главный экран.')
     ];
 
-    /* РАЗРЕШЕНО: реклама, телеметрия, bloat и производительность. */
     const googletv = [
-        P('com.google.android.tvrecommendations', 'Рекламные рекомендации Google TV', 'ads', 'disable', 'low', 'Исчезнут промо-ряды на главном экране. Перестанет постоянно тянуть сеть.', 'pda'),
-        P('com.google.android.katniss', 'Голосовой ассистент Google', 'perf', 'ask', 'medium', 'Умрёт голосовой поиск с пульта. Освободит заметную часть ОЗУ на 2 ГБ.', 'pda'),
-        P('com.google.android.apps.tv.dreamx', 'Ambient-заставка', 'perf', 'ask', 'low', 'Пропадёт фоторежим при простое. Меньше фоновой активности и трафика.', 'pda'),
-        P('com.google.android.feedback', 'Отчёты об ошибках', 'telemetry', 'ask', 'low', 'Диагностика перестанет отправляться в Google. На работу ТВ не влияет.', 'pda'),
-        P('com.google.android.backuptransport', 'Облачный бэкап настроек', 'telemetry', 'ask', 'low', 'Настройки перестанут синхронизироваться с аккаунтом Google.'),
-        P('com.google.android.partnersetup', 'Партнёрская настройка', 'bloat', 'ask', 'low', 'Предустановка партнёрских сервисов. Обычно не нужна.'),
-        P('com.google.android.videos', 'Play Movies (фильмы Google)', 'bloat', 'ask', 'low', 'Магазин фильмов Google в РФ не работает — сервис просто висит в памяти.'),
-        P('com.google.android.play.games', 'Play Games', 'bloat', 'ask', 'low', 'Игровой сервис Google: достижения и облачные сохранения.'),
-        P('com.google.android.youtube.tv', 'YouTube официальный', 'media', 'ask', 'medium', 'YouTube исчезнет. Замена без рекламы — SmartTube (ставится отдельно).', 'pda'),
-        P('com.google.android.youtube.tvmusic', 'YouTube Music', 'media', 'ask', 'low', 'Приложение YouTube Music исчезнет из лаунчера.')
+        P('com.google.android.tvrecommendations', 'Рекламные рекомендации Google TV', 'ads', 'low', 'safe', 'Отдельный пакет промо-рядов. На части прошивок TCL его нет вовсе — тогда лента живёт внутри launcherx.', 'Главный экран станет пустым и перестанет грузить сеть.', 'Пропадут подборки и рекомендации. Приложения и входы останутся.', 'pda'),
+        P('com.google.android.katniss', 'Голосовой ассистент Google', 'perf', 'medium', 'optional', 'Держит в памяти голосовой поиск и обработку команд с пульта.', 'Заметная экономия ОЗУ на 2 ГБ, меньше фоновой активности.', 'Голосовой поиск с пульта перестанет работать. Кнопки и обычный поиск останутся.', 'pda'),
+        P('com.google.android.tv.assistant', 'Ассистент Google на ТВ', 'perf', 'medium', 'optional', 'Компонент Assistant для Android TV: голосовые команды и экранные ответы.', 'Освободит ОЗУ и уберёт фоновую активность голосового сервиса.', 'Голосовой поиск и ассистент с пульта перестанут работать.'),
+        P('com.google.android.apps.tv.dreamx', 'Ambient-заставка', 'perf', 'low', 'optional', 'Показывает фотографии и промо, когда телевизор простаивает.', 'Меньше фонового трафика и пробуждений процессора.', 'Пропадёт фоторежим и заставка при простое. Экран будет просто гаснуть.', 'pda'),
+        P('com.google.android.feedback', 'Отчёты об ошибках', 'telemetry', 'low', 'optional', 'Отправляет в Google диагностику и отчёты о сбоях.', 'Меньше фоновых отправок, приватнее.', 'Отчёты перестанут отправляться. На работу ТВ не влияет.', 'pda'),
+        P('com.google.android.backuptransport', 'Облачный бэкап настроек', 'telemetry', 'low', 'optional', 'Синхронизирует настройки и данные с аккаунтом Google.', 'Меньше фоновой синхронизации.', 'Настройки не восстановятся автоматически после сброса.'),
+        P('com.google.android.partnersetup', 'Партнёрская настройка', 'bloat', 'low', 'optional', 'Применяет предустановленные партнёрские параметры прошивки.', 'Немного памяти и меньше фоновых задач.', 'Партнёрские предустановки не применятся. Обычно незаметно.'),
+        P('android.autoinstalls.config.google.gtvpai', 'Автоустановка партнёрских приложений', 'bloat', 'low', 'optional', 'Конфигурация Play Auto Install: список приложений, ставящихся при первой настройке.', 'После сброса партнёрские приложения не установятся сами.', 'Автоустановка при первичной настройке и после сброса перестанет работать; на настроенном ТВ ничего не изменится.'),
+        P('com.android.settings.intelligence', 'Поиск и подсказки в настройках', 'bloat', 'low', 'optional', 'Надстройка над настройками: поиск по пунктам меню и подсказки.', 'Меньше фоновой активности.', 'Пропадёт поиск по настройкам и подсказки; сами настройки останутся.'),
+        P('com.google.android.videos', 'Play Movies', 'bloat', 'low', 'optional', 'Магазин фильмов Google, в России не работает.', 'Десятки мегабайт памяти и ноль пользы.', 'Пропадёт неработающий магазин фильмов Google.'),
+        P('com.google.android.play.games', 'Play Games', 'bloat', 'low', 'optional', 'Игровые достижения и облачные сохранения Google.', 'Несколько мегабайт памяти.', 'Достижения и облачные сохранения перестанут работать.'),
+        P('au.com.stan.and', 'Stan (австралийский стриминг)', 'bloat', 'low', 'safe', 'Предустановленное приложение австралийского видеосервиса Stan.', 'Освободит память и уберёт неработающий в России сервис.', 'Приложение исчезнет из лаунчера; в России сервис недоступен.'),
+        P('com.google.android.youtube.tv', 'YouTube официальный', 'media', 'medium', 'caution', 'Штатный клиент YouTube с рекламой.', 'Меньше памяти, если поставишь замену.', 'YouTube исчезнет. Сначала установи SmartTube, иначе останешься без YouTube.', 'pda'),
+        P('com.google.android.youtube.tvmusic', 'YouTube Music', 'media', 'low', 'optional', 'Клиент YouTube Music для телевизора.', 'Несколько мегабайт памяти.', 'Приложение исчезнет из лаунчера.')
     ];
 
     const tcl = [
-        P('com.tcl.waterfall.overseas', 'Лента рекомендаций TCL', 'ads', 'ask', 'low', 'Пропадёт лента промо на главном экране TCL.'),
-        P('com.tcl.tclchannel.overlay', 'FAST-каналы TCL', 'ads', 'ask', 'medium', 'Пропадут бесплатные рекламные интернет-каналы TCL.'),
-        P('com.tcl.advertise', 'Рекламный модуль TCL', 'ads', 'ask', 'medium', 'Имя-кандидат: сверь сканом на своей модели.', 'pda'),
-        P('com.tcl.assistant', 'Ассистент TCL', 'perf', 'ask', 'medium', 'Голосовой помощник TCL перестанет отвечать.'),
-        P('com.tcl.browser', 'Браузер TCL', 'bloat', 'ask', 'low', 'Штатный браузер исчезнет. Сторонний браузер продолжит работать.'),
-        P('com.tcl.gallery', 'Галерея TCL', 'bloat', 'ask', 'medium', 'Просмотр фото и видео через штатную галерею. Файлы на флешке останутся доступны другим приложениям.'),
-        P('com.tcl.esticker', 'Стикеры TCL', 'bloat', 'ask', 'low', 'Декоративные стикеры в интерфейсе.'),
-        P('com.tcl.messagebox', 'Уведомления TCL', 'bloat', 'ask', 'low', 'Всплывающие сообщения и промо от TCL.'),
-        P('com.tcl.useragreement', 'Пользовательское соглашение', 'bloat', 'ask', 'low', 'Экран соглашения при настройке.'),
-        P('com.tcl.usercenter', 'Личный кабинет TCL', 'bloat', 'ask', 'low', 'Аккаунт TCL и его сервисы.'),
-        P('com.tcl.dashboard', 'Панель TCL', 'bloat', 'ask', 'medium', 'Быстрая панель настроек TCL.'),
-        P('com.tcl.customize.overlay', 'Кастомизация интерфейса', 'bloat', 'ask', 'medium', 'Часть настроек внешнего вида оболочки.'),
-        P('com.tcl.partnercustomizer', 'Партнёрские настройки', 'bloat', 'ask', 'low', 'Предустановленные партнёрские параметры.'),
-        P('com.tcl.miracast', 'Miracast', 'media', 'ask', 'medium', 'Трансляция экрана телефона по Wi-Fi Direct.'),
-        P('com.tcl.MultiScreenInteraction_TV', 'Мультиэкран TCL', 'media', 'ask', 'medium', 'Взаимодействие с несколькими экранами.'),
-        P('com.tcl.keyhelp', 'Подсказки по кнопкам пульта', 'bloat', 'ask', 'low', 'Всплывающие подсказки по пульту.'),
-        P('com.tcl.hotemenu', 'Отельный режим', 'bloat', 'ask', 'low', 'Меню отельного режима. Дома не используется.')
+        P('com.tcl.waterfall.overseas', 'Лента рекомендаций TCL', 'ads', 'low', 'optional', 'Бесконечная лента промо и подборок на главном экране TCL.', 'Главный экран станет чище и быстрее.', 'Пропадёт лента рекомендаций TCL. Приложения и входы останутся.'),
+        P('com.tcl.tclchannel.overlay', 'FAST-каналы TCL (оверлей)', 'ads', 'medium', 'optional', 'Бесплатные интернет-каналы с рекламой поверх оболочки.', 'Меньше фонового трафика и рекламы.', 'Пропадут бесплатные рекламные каналы TCL.'),
+        P('com.tcl.channelplus', 'TCL Channel+ (бесплатные каналы)', 'ads', 'low', 'optional', 'Сервис бесплатных интернет-каналов TCL с рекламой (FAST). Это не список эфирных каналов — за эфир отвечают com.tcl.tvinput и com.android.providers.tv.', 'Пропадёт рекламная лента каналов, меньше фонового трафика.', 'Исчезнут бесплатные каналы TCL Channel+; эфирные каналы, HDMI и приложения не затрагиваются.'),
+        P('com.tcl.advertise', 'Рекламный модуль TCL', 'ads', 'medium', 'optional', 'Служба показа рекламных вставок оболочки TCL.', 'Меньше рекламы и фоновых обращений.', 'Рекламные вставки исчезнут. Имя пакета сверь сканом на своей модели.', 'pda'),
+        P('com.tcl.assistant', 'Ассистент TCL', 'perf', 'medium', 'optional', 'Голосовой помощник TCL, висит в памяти.', 'Экономия ОЗУ и меньше фоновых пробуждений.', 'Голосовой помощник TCL перестанет отвечать.'),
+        P('com.tcl.smartalexa', 'Интеграция Alexa (TCL)', 'bloat', 'medium', 'optional', 'Интеграция голосового помощника Amazon Alexa.', 'Меньше фоновых сервисов и сетевых обращений.', 'Управление через Alexa и голосовые команды Alexa перестанут работать.'),
+        P('com.tcl.browser', 'Браузер TCL', 'bloat', 'low', 'optional', 'Штатный браузер прошивки.', 'Несколько мегабайт памяти.', 'Штатный браузер исчезнет. Сторонний продолжит работать.'),
+        P('com.tcl.gallery', 'Галерея TCL', 'bloat', 'medium', 'caution', 'Просмотр фото и видео. На прошивках TCL зарегистрирована как экранная заставка и потому держится в памяти постоянно.', 'На замере TCL G07 держала 147 МБ ОЗУ — отключение вместе со сменой заставки освобождает их.', 'Штатная галерея исчезнет, заставка перестанет работать. Файлы с флешки открой другим приложением.'),
+        P('com.tcl.esticker', 'Стикеры TCL', 'bloat', 'low', 'optional', 'Декоративные стикеры в интерфейсе.', 'Немного памяти.', 'Пропадут декоративные стикеры.'),
+        P('com.tcl.messagebox', 'Уведомления TCL', 'bloat', 'low', 'optional', 'Всплывающие сообщения и промо от производителя.', 'Меньше всплывающих окон.', 'Пропадут служебные и промо-уведомления TCL.'),
+        P('com.tcl.notereminder', 'Заметки и напоминания TCL', 'bloat', 'low', 'optional', 'Приложение заметок и напоминаний на экране телевизора.', 'Освободит память, уберёт фоновые напоминания.', 'Заметки и напоминания перестанут работать и исчезнут из лаунчера.'),
+        P('com.tcl.useragreement', 'Пользовательское соглашение', 'bloat', 'low', 'optional', 'Экраны соглашений и согласий.', 'Немного памяти.', 'Экран соглашения перестанет показываться.'),
+        P('com.tcl.usercenter', 'Личный кабинет TCL', 'bloat', 'low', 'optional', 'Аккаунт TCL и связанные сервисы.', 'Несколько мегабайт памяти.', 'Личный кабинет TCL станет недоступен.'),
+        P('com.tcl.hotelmenu', 'Отельный режим TCL', 'bloat', 'low', 'optional', 'Ограничения громкости, источников и настроек для гостиниц.', 'Уберёт неиспользуемый дома сервис.', 'Отельный режим станет недоступен; дома не используется.'),
+        P('com.tcl.dashboard', 'Панель TCL', 'bloat', 'medium', 'caution', 'Быстрая панель настроек поверх изображения.', 'Немного памяти.', 'Быстрая панель перестанет вызываться. Обычные настройки останутся.'),
+        P('com.tcl.customize.overlay', 'Кастомизация интерфейса', 'bloat', 'medium', 'caution', 'Оверлей с настройками внешнего вида оболочки.', 'Немного памяти.', 'Часть настроек внешнего вида пропадёт.'),
+        P('com.tcl.partnercustomizer', 'Партнёрские настройки', 'bloat', 'low', 'optional', 'Применяет партнёрские параметры прошивки.', 'Немного памяти.', 'Партнёрские предустановки не применятся.'),
+        P('com.tcl.keyhelp', 'Подсказки по кнопкам пульта', 'bloat', 'low', 'optional', 'Всплывающие подсказки о назначении кнопок.', 'Немного памяти.', 'Подсказки по пульту исчезнут.'),
+        P('com.tcl.miracast', 'Miracast', 'media', 'medium', 'caution', 'Трансляция экрана телефона по Wi-Fi Direct.', 'Несколько мегабайт памяти.', 'Трансляция экрана телефона перестанет работать.'),
+        P('com.tcl.MultiScreenInteraction_TV', 'Мультиэкран TCL', 'media', 'medium', 'caution', 'Взаимодействие телевизора с несколькими экранами.', 'Несколько мегабайт памяти.', 'Функции мультиэкрана перестанут работать.')
     ];
 
     const yandex = [
-        P('com.yandex.android.advid', 'Рекламный движок Яндекс ТВ', 'ads', 'disable', 'low', 'Исчезнет реклама на главной и перед приложениями.', 'habr'),
-        P('com.yandex.tv.recommendations', 'Рекламные рекомендации', 'ads', 'ask', 'medium', 'Промо-ряды кинотеатров. Имя уточни сканом.', 'pda'),
-        P('com.yandex.tv.analytics', 'Телеметрия интерфейса', 'telemetry', 'ask', 'medium', 'Статистика использования. На части прошивок связана с отчётами об ошибках.', 'pda'),
-        P('com.yandex.tv.acr', 'ACR — распознавание контента', 'acr', 'ask', 'medium', 'Перестанет распознавать, что ты смотришь, для таргетинга рекламы.', 'habr'),
-        P('com.yandex.tv.updater', 'Обновления прошивки', 'update', 'ask', 'medium', 'OTA перестанет приходить. Реклама не вернётся, но и патчи тоже.', 'habr')
+        P('com.yandex.android.advid', 'Рекламный движок Яндекс ТВ', 'ads', 'low', 'safe', 'Показывает рекламу на главной и перед запуском приложений.', 'Реклама исчезнет, интерфейс станет отзывчивее.', 'Пропадут рекламные вставки. Приложения и эфир останутся.', 'habr'),
+        P('com.yandex.tv.recommendations', 'Рекламные рекомендации', 'ads', 'medium', 'optional', 'Промо-ряды онлайн-кинотеатров на главной.', 'Чище главный экран, меньше трафика.', 'Пропадут подборки кинотеатров. Имя уточни сканом.', 'pda'),
+        P('com.yandex.tv.analytics', 'Телеметрия интерфейса', 'telemetry', 'medium', 'optional', 'Собирает статистику использования оболочки.', 'Меньше фоновых отправок, приватнее.', 'Статистика перестанет собираться; на части прошивок пропадут отчёты об ошибках.', 'pda'),
+        P('com.yandex.tv.acr', 'ACR — распознавание контента', 'acr', 'medium', 'optional', 'Определяет, что смотришь, для таргетинга рекламы.', 'Телевизор перестанет «слушать» эфир.', 'Пропадёт распознавание контента и связанные подсказки.', 'habr'),
+        P('com.yandex.tv.updater', 'Обновления прошивки', 'update', 'medium', 'caution', 'Скачивает и ставит OTA-обновления.', 'Реклама не вернётся после обновления.', 'Обновления и патчи безопасности перестанут приходить.', 'habr')
     ];
     const xiaomi = [
-        P('com.miui.tv.analytics', 'Аналитика Mi TV', 'telemetry', 'disable', 'low', 'Статистика MIUI TV перестанет собираться.', 'habr'),
-        P('com.xiaomi.mitv.advertise', 'Рекламный сервис Mi TV', 'ads', 'disable', 'low', 'Исчезнет реклама перед приложениями и на главной.', 'pda'),
-        P('com.xiaomi.mitv.upgrade', 'Обновления прошивки', 'update', 'ask', 'medium', 'OTA MIUI TV перестанет приходить.'),
-        P('com.xiaomi.mitv.tvpushservice', 'Push-уведомления Mi TV', 'telemetry', 'ask', 'medium', 'Фоновые маркетинговые уведомления.')
+        P('com.miui.tv.analytics', 'Аналитика Mi TV', 'telemetry', 'low', 'safe', 'Собирает статистику MIUI TV.', 'Меньше фоновой активности, приватнее.', 'Статистика перестанет собираться. На работу ТВ не влияет.', 'habr'),
+        P('com.xiaomi.mitv.advertise', 'Рекламный сервис Mi TV', 'ads', 'low', 'safe', 'Реклама перед приложениями и на главной MIUI TV.', 'Реклама исчезнет.', 'Пропадут рекламные вставки. Приложения останутся.', 'pda'),
+        P('com.xiaomi.mitv.upgrade', 'Обновления прошивки', 'update', 'medium', 'caution', 'OTA-обновления MIUI TV.', 'Проще контролировать прошивку.', 'Обновления и патчи перестанут приходить.'),
+        P('com.xiaomi.mitv.tvpushservice', 'Push-уведомления Mi TV', 'telemetry', 'medium', 'optional', 'Доставляет маркетинговые уведомления.', 'Меньше всплывающих окон и трафика.', 'Пропадут push-уведомления оболочки.')
     ];
     const sber = [
-        P('ru.sberdevices.ads', 'Рекламный модуль Салют', 'ads', 'ask', 'medium', 'Имя-кандидат: уточни сканом на своей прошивке.', 'pda'),
-        P('ru.sberdevices.analytics', 'Аналитика Салют', 'telemetry', 'ask', 'medium', 'Кандидат сообщества, требует проверки.', 'pda')
+        P('ru.sberdevices.ads', 'Рекламный модуль Салют', 'ads', 'medium', 'optional', 'Рекламные вставки оболочки Салют.', 'Меньше рекламы.', 'Реклама исчезнет. Имя уточни сканом на своей прошивке.', 'pda'),
+        P('ru.sberdevices.analytics', 'Аналитика Салют', 'telemetry', 'medium', 'optional', 'Сбор статистики использования.', 'Приватнее, меньше фоновых задач.', 'Статистика перестанет собираться. Требует проверки на модели.', 'pda')
     ];
-    const haier = [P('com.cvte.tv.advertise', 'Реклама CVTE', 'ads', 'ask', 'medium', 'Кандидат для плат CVTE/Cultraview.', 'pda')];
+    const haier = [P('com.cvte.tv.advertise', 'Реклама CVTE', 'ads', 'medium', 'optional', 'Рекламный модуль плат CVTE и Cultraview.', 'Меньше рекламы.', 'Рекламные вставки исчезнут. Имя сверь сканом.', 'pda')];
 
-    /* ПОЛЬЗОВАТЕЛЬСКИЕ ПРИЛОЖЕНИЯ — отключать безопасно, просто исчезнут из лаунчера. */
     const apps = [
-        P('ru.kinopoisk.tv', 'Кинопоиск', 'apps', 'ask', 'low', 'Приложение исчезнет из лаунчера. Фильмы через него смотреть не получится.'),
-        P('ru.start.androidmobile', 'START', 'apps', 'ask', 'low', 'Приложение исчезнет из лаунчера.'),
-        P('gpm.tnt_premier', 'PREMIER', 'apps', 'ask', 'low', 'Приложение исчезнет из лаунчера.'),
-        P('mobi.zona', 'ZONA', 'apps', 'ask', 'low', 'Приложение исчезнет из лаунчера.'),
-        P('com.vk.tv', 'VK Видео', 'apps', 'ask', 'low', 'Приложение исчезнет из лаунчера.'),
-        P('ru.yandex.music', 'Яндекс Музыка', 'apps', 'ask', 'low', 'Приложение исчезнет из лаунчера.'),
-        P('tv.wuaki.apptv', 'Видеосервис Wuaki / Wink', 'apps', 'ask', 'low', 'Приложение исчезнет из лаунчера. Точное название сверь на ТВ.'),
-        P('com.tvos', 'Приложение TVOS', 'apps', 'ask', 'medium', 'Назначение уточни на ТВ перед отключением.'),
-        P('com.netflix.ninja', 'Netflix', 'apps', 'ask', 'low', 'Приложение исчезнет из лаунчера.'),
-        P('com.amazon.amazonvideo.livingroom', 'Prime Video', 'apps', 'ask', 'low', 'Приложение исчезнет из лаунчера.'),
-        P('com.valvesoftware.steamlink', 'Steam Link', 'apps', 'ask', 'low', 'Трансляция игр с ПК на телевизор.'),
-        P('com.hiro.vpn', 'Hiro VPN', 'apps', 'ask', 'low', 'VPN-приложение исчезнет. Учти: системный com.android.vpndialogs отключать нельзя.'),
-        P('com.lagomproductsllc.lagomvpn', 'Lagom VPN', 'apps', 'ask', 'low', 'VPN-приложение исчезнет из лаунчера.'),
-        P('com.ogonconnect.app', 'Ogon Connect (VPN)', 'apps', 'ask', 'low', 'VPN-приложение исчезнет из лаунчера.'),
-        P('com.pipinetwork.piplvpn', 'PIPL VPN', 'apps', 'ask', 'low', 'VPN-приложение исчезнет из лаунчера.')
+        P('ru.kinopoisk.tv', 'Кинопоиск', 'apps', 'low', 'optional', 'Онлайн-кинотеатр Кинопоиск.', 'Освободит память, если не пользуешься.', 'Приложение исчезнет из лаунчера.'),
+        P('ru.start.androidmobile', 'START', 'apps', 'low', 'optional', 'Онлайн-кинотеатр START.', 'Освободит память.', 'Приложение исчезнет из лаунчера.'),
+        P('gpm.tnt_premier', 'PREMIER', 'apps', 'low', 'optional', 'Онлайн-кинотеатр PREMIER.', 'Освободит память.', 'Приложение исчезнет из лаунчера.'),
+        P('mobi.zona', 'ZONA', 'apps', 'low', 'optional', 'Каталог фильмов и сериалов ZONA.', 'Освободит память.', 'Приложение исчезнет из лаунчера.'),
+        P('com.vk.tv', 'VK Видео', 'apps', 'low', 'optional', 'Клиент VK Видео для телевизора.', 'Освободит память.', 'Приложение исчезнет из лаунчера.'),
+        P('ru.yandex.music', 'Яндекс Музыка', 'apps', 'low', 'optional', 'Стриминг музыки.', 'Освободит память.', 'Приложение исчезнет из лаунчера.'),
+        P('tv.wuaki.apptv', 'Видеосервис Wuaki / Wink', 'apps', 'low', 'optional', 'Приложение видеосервиса на этой прошивке.', 'Освободит память.', 'Приложение исчезнет. Точное название сверь на телевизоре.'),
+        P('com.tvos', 'Приложение TVOS', 'apps', 'medium', 'caution', 'Стороннее приложение с неочевидным назначением.', 'Освободит память.', 'Назначение уточни на ТВ: возможно, это оболочка или магазин.'),
+        P('com.netflix.ninja', 'Netflix', 'apps', 'low', 'optional', 'Клиент Netflix.', 'Освободит память.', 'Приложение исчезнет из лаунчера.'),
+        P('com.amazon.amazonvideo.livingroom', 'Prime Video', 'apps', 'low', 'optional', 'Клиент Amazon Prime Video.', 'Освободит память.', 'Приложение исчезнет из лаунчера.'),
+        P('com.valvesoftware.steamlink', 'Steam Link', 'apps', 'low', 'optional', 'Трансляция игр с компьютера на телевизор.', 'Освободит память.', 'Трансляция игр с ПК перестанет работать.'),
+        P('com.hiro.vpn', 'Hiro VPN', 'apps', 'low', 'optional', 'VPN-клиент.', 'Освободит память и уберёт фоновое подключение.', 'Этот VPN перестанет работать. Системный com.android.vpndialogs трогать нельзя.'),
+        P('com.lagomproductsllc.lagomvpn', 'Lagom VPN', 'apps', 'low', 'optional', 'VPN-клиент.', 'Освободит память.', 'Этот VPN перестанет работать.'),
+        P('com.ogonconnect.app', 'Ogon Connect', 'apps', 'low', 'optional', 'VPN-клиент.', 'Освободит память.', 'Этот VPN перестанет работать.'),
+        P('com.piplnetwork.piplvpn', 'PIPL VPN', 'apps', 'low', 'optional', 'VPN-клиент PIPL VPN.', 'Освободит память и уберёт фоновое подключение.', 'Этот VPN перестанет работать. Системный com.android.vpndialogs трогать нельзя.')
     ];
 
-    const packages = { core, googletv, tcl, yandex, xiaomi, sber, haier, apps };
-    packages.generic = googletv;
-
+    const dedupe = arr => {
+        const seen = new Set(), out = [];
+        for (const p of arr) { if (seen.has(p.name)) continue; seen.add(p.name); out.push(p); } return out;
+    };
+    const packages = {
+        core: dedupe(core), googletv: dedupe(googletv), tcl: dedupe(tcl),
+        yandex: dedupe(yandex), xiaomi: dedupe(xiaomi), sber: dedupe(sber), haier: dedupe(haier), apps: dedupe(apps)
+    };
     const all = Object.values(packages).flat();
-    const never = all.filter(p => p.act === 'never').map(p => p.name);
-    const patterns = ['inputmethod', 'keyboard', 'launcher', 'tvhome', 'tclhome', 'systemui', 'installer', 'providers',
-        '\\.settings', 'wifi', 'bluetooth', 'hdmi', 'tvinput', 'factory', 'hkcfac', 'location\\.fused', 'services\\.platform',
-        'yandex\\.tv\\.live', 'tcl\\.suspension', 'starlauncher', 'gms$', 'gsf$', 'vending', '^android$', '^com\\.android\\.',
-        'webview', 'permissioncontroller', 'externalstorage', 'documentsui', '\\.shell$', 'networkstack', 'tethering',
-        'captiveportal', 'keychain', 'proxyhandler', 'pacprocessor', 'statementservice', 'sharedstoragebackup',
-        'localtransport', 'backupconfirm', 'dynsystem', 'inputdevices', 'vpndialogs', 'companiondevicemanager', 'ctsshim',
-        'setupwraith', 'authbridge', 'mediashell', 'smartconnect', 'ext\\.services', 'ext\\.shared', 'modulemetadata',
-        'onetimeinitializer', 'overlay\\.modules', 'syncadapters', '\\.tts$', 'talkback', 'remote\\.service',
-        'frameworkpackagestubs', 'com\\.tcl\\.system', 'com\\.tcl\\.guard', 'com\\.tcl\\.initsetup', 'com\\.tcl\\.autopair',
-        'com\\.tcl\\.micmanager', 'com\\.tcl\\.ttvs', '^com\\.tcl\\.tv$', 'channelpus', 't_solo', 'ui_mediacenter'];
+    const floor = ['android', 'com.android.shell'];
+    const never = all.filter(p => p.verdict === 'forbidden').map(p => p.name);
+    const allowed = all.filter(p => p.verdict !== 'forbidden').map(p => p.name);
 
     const categories = {
-        ads: { label: 'Реклама', color: '#ff3d5e' }, telemetry: { label: 'Телеметрия', color: '#8b7bff' },
-        acr: { label: 'ACR-слежка', color: '#ff4dd8' }, update: { label: 'Обновления', color: '#ffb02e' },
-        bloat: { label: 'Bloatware', color: '#38c8ff' }, perf: { label: 'Производительность', color: '#c6ff4d' },
-        media: { label: 'Медиа', color: '#3dffa8' }, apps: { label: 'Приложения', color: '#38c8ff' },
-        system: { label: 'Системные', color: '#8fa2bd' }, unknown: { label: 'Вне базы', color: '#5d6f8c' }
+        ads: 'Реклама', telemetry: 'Телеметрия', acr: 'ACR-слежка', update: 'Обновления',
+        bloat: 'Предустановленное', perf: 'Производительность', media: 'Медиа', apps: 'Приложения',
+        system: 'Система', unknown: 'Вне базы'
     };
     const risks = { low: 'низкий', medium: 'средний', high: 'высокий', critical: 'критический' };
     const riskOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-
-    const trouble = [
-        ['«failed to connect / connection refused»', 'Отладка не включена или порт закрыт. Проверь «Отладку по USB»; на CVTE — ADB Mode; на Android 11+ нужен режим «с кодом». ПК и ТВ в одной сети.'],
-        ['«unauthorized» / «failed to authenticate»', 'Подтверди RSA на экране ТВ. Нет окна — «Отозвать авторизации отладки», выкл/вкл отладку, повтори.'],
-        ['ТВ не отвечает', 'Одна подсеть (оба 192.168.x.x). Гостевая Wi-Fi и AP isolation блокируют соединение.'],
-        ['VPN мешает', 'Выключи VPN на ПК и ТВ: он перехватывает локальные маршруты.'],
-        ['«more than one device»', 'Отключи лишние устройства от adb и повтори.'],
-        ['Пропали флешки / HDMI / пульт', 'Значит, был отключён системный пакет. Журналы → Откатить. Новая версия блокирует такие пакеты на сервере.']];
-    const unsupported = [
-        ['Samsung (Tizen) и LG (webOS)', 'Не Android: ADB-деблоат неприменим. Реально: отключить ACR — Samsung: Настройки → Общие и конфиденциальность → Условия и конфиденциальность → Служба информации о просмотре → Выкл; LG: Все настройки → Общие → Система → Доп. настройки → Live Plus → Выкл.'],
-        ['DNS-фильтрация', 'На роутере или в сети ТВ: AdGuard DNS 94.140.14.14 / 94.140.15.15.'],
-        ['Радикально', 'Приставка на Android TV заменяет смарт-часть; её можно чистить этой программой.']];
-
-    const training = {
-        device: { serial: '192.168.0.0:5555', brand: 'УЧЕБНЫЙ', model: 'ПРИМЕР (не настоящий ТВ)', android: '11', sdk: '30', fingerprint: 'training/example', ip: '192.168.0.0', packageCount: 14, platform: 'yandex', launcher: 'com.yandex.tv.launcher', ime: 'ru.yandex.androidkeyboard.tv' },
-        extra: ['com.yandex.tv.partnerpromo', 'com.yandex.tv.cloudmetrics']
+    const verdicts = {
+        safe: { label: 'Можно смело', tone: 'ok', hint: 'Подтверждено сообществом: отключение безопасно и обратимо.' },
+        optional: { label: 'На твой выбор', tone: 'info', hint: 'Не нужно большинству пользователей. Прочитай, что пропадёт.' },
+        caution: { label: 'Подумай', tone: 'warn', hint: 'Отключение заметно: сначала прочитай последствия и подготовь замену.' },
+        forbidden: { label: 'Нельзя', tone: 'danger', hint: 'Системная функция. В обычном режиме отключение заблокировано сервером.' }
+    };
+    const privacyLabels = {
+        'global.tcl_diagnostic_status': ['Диагностика TCL', 'Отправка отчётов об использовании телевизора производителю.'],
+        'global.tcl_uxp_status': ['UX-программа TCL', 'Сбор данных о том, как ты пользуешься интерфейсом.'],
+        'global.send_action_app_error': ['Отчёты об ошибках (global)', 'Отправка сведений о сбоях приложений.'],
+        'secure.send_action_app_error': ['Отчёты об ошибках (secure)', 'Отправка сведений о сбоях приложений.'],
+        'global.activity_starts_logging_enabled': ['Журнал запусков приложений', 'Запись каждого запуска активности в системный лог.'],
+        'secure.backup_enabled': ['Резервное копирование', 'Копирование настроек и данных в облако.'],
+        'secure.screensaver_enabled': ['Экранная заставка', 'Заставка при простое. На TCL это галерея, которая держится в памяти.']
     };
 
-    return { SRC, platforms, packages, never, patterns, categories, risks, riskOrder, trouble, unsupported, training };
+    const trouble = [
+        ['Не подключается: connection refused', 'Отладка не включена или порт закрыт. Проверь «Отладку по USB», на платах CVTE — ADB Mode, на Android 11+ попробуй режим с кодом. ПК и телевизор в одной сети.'],
+        ['unauthorized или failed to authenticate', 'Подтверди запрос RSA на экране. Если окна нет: «Отозвать авторизации отладки», выключи и включи отладку, повтори.'],
+        ['Подключение есть, но телевизор не отвечает', 'Проверь одну подсеть. Гостевая Wi-Fi и изоляция клиентов на роутере блокируют соединение.'],
+        ['Мешает VPN', 'Выключи VPN на компьютере и на телевизоре: он перехватывает маршруты локальной сети.'],
+        ['more than one device', 'Выполни adb disconnect для лишних устройств и повтори.'],
+        ['Пропали флешки, HDMI или пульт', 'Был отключён системный пакет. Журналы → Откатить, затем перезагрузка.'],
+        ['Отключил, а процесс всё ещё висит', 'Приложение помечено как persistent: система поднимает его мгновенно, force-stop против него бессилен. Нужна перезагрузка телевизора — кнопка в «Обзоре».'],
+        ['Отключил, но на экране ничего не изменилось', 'Оболочка перерисовывает экран не мгновенно. Включи «Обновить экран ТВ». Если приложение открыто — закрой и открой заново.'],
+        ['Диагностика показывает огромную загрузку CPU', 'На платформах Realtek loadavg набит kernel-потоками в состоянии D и не отражает реальную загрузку. Программа считает занятость по строке idle из top — верь ей, а не loadavg.']
+    ];
+    const unsupported = [
+        ['Samsung (Tizen) и LG (webOS)', 'Это не Android. Реально помогает отключить распознавание контента: Samsung — Настройки → Общие и конфиденциальность → Условия и конфиденциальность → Служба информации о просмотре → Выкл; LG — Все настройки → Общие → Система → Дополнительные настройки → Live Plus → Выкл.'],
+        ['Фильтрация на уровне сети', 'DNS AdGuard на роутере: 94.140.14.14 и 94.140.15.15. Режет рекламные и телеметрические домены на любом телевизоре.'],
+        ['Радикальный вариант', 'Приставка на Android TV заменяет смарт-часть телевизора, и её уже можно чистить этой программой.']
+    ];
+
+    const training = {
+        device: {
+            serial: '192.168.0.0:5555', brand: 'УЧЕБНЫЙ', model: 'ПРИМЕР (не настоящий ТВ)', android: '11', sdk: '30',
+            fingerprint: 'training/example/demo', ip: '192.168.0.0', packageCount: 24, platform: 'googletv',
+            launcher: 'com.google.android.apps.tv.launcherx', ime: 'com.google.android.leanback.ime', soc: 'example', abi: 'arm64-v8a'
+        },
+        extra: ['com.tcl.promoengine', 'com.google.android.tv.admodule']
+    };
+
+    return {
+        SRC, platforms, packages, floor, never, allowed, categories, risks, riskOrder, verdicts,
+        privacyLabels, trouble, unsupported, training, converted
+    };
 })();
